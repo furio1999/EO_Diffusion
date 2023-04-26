@@ -1,0 +1,10 @@
+torch
+torchvision
+tqdm
+argparse
+easydict
+pytorch-lightning
+einops
+patchify
+omegaconf
+kornia

@@ -1,0 +1,14 @@
+inriasegm      
+dataset = InriaDataset(path = "../EO-Diffusion/data/AerialImageDataset", transforms=preprocess, compact=False, size = image_size,
+        ch_last=False,img_ch=3, mask_ch=1, cond="image", uncond="segmentation", num_patches=2000, patch_overlap=0.5, category="vienna")
+    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size,image_size=64, num_workers=4)
+    model=MNISTDiffusion(timesteps=args.timesteps,
+                image_size=64,
+                in_channels=1,
+                cond_channels = 3,
+                out_channels = 1,
+                base_dim=args.model_base_dim, # 128
+                dim_mults=[1,2,4,8]).to(device)
+
+class cond
+python train.py --num_classes 5 --n_samples 16 --model_base_dim 128 --epochs 500
