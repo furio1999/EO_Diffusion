@@ -3,4 +3,3 @@ cifar_data/
 mnist_data/
 wandb/
 results/*.png
-results/*/*.png
