@@ -3,6 +3,7 @@ import numpy as np
 import time
 import torch
 import torchvision
+import torchvision.transforms.functional as F
 import pytorch_lightning as pl
 from tqdm import tqdm
 from einops import rearrange
@@ -17,6 +18,7 @@ import kornia
 from kornia.utils import image_to_tensor
 import kornia.augmentation as KA
 import pdb, random
+import pandas as pd
 
 # inria: 2 classes? multiclasses in an image?
 
@@ -208,7 +210,7 @@ class InriaDataset(Dataset):
     # would be nice having init working once per all
     def __init__(self, path="data/AerialImageDataset", val_split=0.15, length=0, num_patches=1, patch_overlap=0.5, transforms =None,
     size=64, device="cpu", nlabels = 2, img_ch=3, mask_ch=3, category = None, threshold=0.5, compact=True, cond=None, uncond="image", 
-    use_val=None, ch_last=True, load_from_disk=False):
+    use_val=None, ch_last=True, load_from_disk=False, use_int=False):
         images = sorted(glob.glob(os.path.join(path, "train/images", "*tif")))
         masks = sorted(glob.glob(os.path.join(path, "train/gt", "*tif")))
         li, lm = len(images), len(masks)
@@ -225,6 +227,7 @@ class InriaDataset(Dataset):
         self.mode = "RGB" if img_ch==3 else "L"
         self.category = category
         self.device, self.threshold = device, threshold
+        self.use_int = use_int
         images, masks = select_class(images, masks, cat=category)
 
         if length > 0 and length < len(images):
@@ -264,20 +267,7 @@ class InriaDataset(Dataset):
         else:
           pass """
         
-        self.length = len(self.ims) if type(self.ims) is list else self.ims.shape[0]
-        
-
-        if self.transforms is not None:
-            if self.cond is not None:
-                data_keys=2*['input']
-            else:
-                data_keys=['input']
-
-            self.input_T=KA.container.AugmentationSequential(
-                *self.transforms,
-                data_keys=data_keys,
-                same_on_batch=False
-            )  
+        self.length = len(self.ims) if type(self.ims) is list else self.ims.shape[0]  
 
         self.pil_to_tensor = torchvision.transforms.PILToTensor()
         self.process = KA.RandomGaussianBlur((3,3),(0.1,2.0))
@@ -299,12 +289,15 @@ class InriaDataset(Dataset):
           image, mask = self.pil_to_tensor(Image.open(imfile))/255, self.pil_to_tensor(Image.open(maskfile).convert("L"))/255
         else:
           image, mask = imfile/255, maskfile/255
+        example["image_orig"], example["mask_orig"] = image, mask
         if self.transforms is not None:
-          out = self.input_T(image, mask)
-          image,mask = out[0], out[1]
+          out = self.transforms(torch.cat((image,mask),0))
+          image,mask = out[:3], out[3][None]
           #image,mask = image[0],mask[0]
         if image.shape[-1]>image.shape[0] and self.ch_last:
           image, mask = rearrange(image, 'c h w -> h w c'), rearrange(mask, 'c h w -> h w c')
+        if self.use_int:
+          image, mask = (image*255).type(torch.uint8),(mask*255).type(torch.uint8)
         
         #image = mask * image + (1-mask)*self.process(image)[0]
         # TODO select class label
@@ -389,13 +382,92 @@ class InriaData(InriaDataset):
 class myMNIST(torchvision.datasets.MNIST):
   def __getitem__(self,i):
     x,y = super().__getitem__(i)
-    x = x[:,2:26,2:26]
-    return x
+    #x = rearrange(x, "c h w->h w c")
+    vocab = {}
+    vocab["image"], vocab["class_label"] = x, y
+    return vocab
 
 class myCIFAR10(torchvision.datasets.CIFAR10):
   def __getitem__(self,i):
     x,y = super().__getitem__(i)
-    return x
+    vocab = {}
+    vocab["image"], vocab["class_label"] = x, y
+    return vocab
+
+# to handle space limitations: provide custom windowing for patches + custom choice of tile (instead of :length) 
+class CloudMaskDataset(Dataset):
+   def __init__(self, root="../data/Sentinel-2-CMC", classes=['agricultural', 'urban/developed', 'hills/mountains'], percents=[50,25,70], 
+   size=64, num_patches=200, ratio=0, length=3, load_from_disk=True,
+                transforms=None):
+      self.orig_size, self.step = 1022, int((1-ratio)*size)
+      self.num_patches, self.size = min(num_patches, (int(self.orig_size/self.step))**2), size # np_I*np_J
+      self.load_from_disk = load_from_disk
+      self.np_J = int(self.orig_size/self.step)
+      self.transforms, self.eq = transforms, torchvision.transforms.RandomEqualize(p=0.7)
+      self.img_path, self.mask_path = os.path.join(root,"subscenes"), os.path.join(root,"masks")
+      db = pd.read_csv(root + "/classification_tags.csv", index_col="index")
+
+      key_percents = ["clear_percent", "cloud_percent", "shadow_percent"]
+      cover_dict = {key:val for key,val in zip(key_percents,percents)}
+      #'agricultural', 'urban/developed', 'hills/mountains'
+      db_constr = (db["snow/ice"]==0)*(db["clear_percent"]>=percents[0])*(db["cloud_percent"]>=percents[1])
+      db_truth = (db[classes[0]]==1) if classes is not [] else (db["agricultural"]==0) | (db["agricultural"]==1)
+      for key in classes: db_truth += (db[key]==1)
+      db_truth = db_truth * db_constr
+      db = db[db_truth]
+
+      names = db["scene"]
+      self.names = names[:length] if length > 0 and length<len(names) else names
+      self.index, self.db = self.names.index, db
+      self.length = len(self.names)*self.num_patches
+      print(f"extracting {self.length} patches from {len(self.names)} tiles")
+      if self.num_patches > 0 and not load_from_disk:
+        self.ims, self.ms = self.make_patches()
+        assert len(self.ims)==self.length/self.num_patches, print(f"expected length {self.length} vs actual length {len(self.ims)}")
+
+   def __len__(self):
+      return self.length
+   def __getitem__(self,i):
+      n, npatches = int(i/self.num_patches), i%self.num_patches
+      if self.load_from_disk:
+        self.imgs, self.masks = np.load(os.path.join(self.img_path, self.names[self.index[n]]+".npy")),\
+        np.load(os.path.join(self.mask_path, self.names[self.index[n]]+".npy"))
+        self.imgs = self.imgs[...,[3,2,1]]
+        self.imgs = np.clip(self.imgs, 0,1)
+        self.imgs, self.masks = torch.from_numpy(self.imgs).permute(2,0,1), torch.from_numpy(self.masks).permute(2,0,1).to(torch.float32)[None,1]
+      else: self.imgs,self.masks = self.ims[n],self.ms[n]
+      #self.imgs = self.imgs.clip(0.,1.)
+
+      idx_i, idx_j=int(npatches/self.np_J)*self.step, (npatches%self.np_J)*self.step
+      img,mask = self.imgs[:,idx_i:idx_i+self.step, idx_j:idx_j+self.step], self.masks[:,idx_i:idx_i+self.step, idx_j:idx_j+self.step]
+      #img = self.eq((img*255).to(torch.uint8))/255
+      #if img.mean() < 0.2: img = F.adjust_brightness(img, 3)
+
+      if self.transforms is not None:
+        out = self.transforms(torch.cat((img,mask),0))
+        img,mask = out[:3], out[3][None]
+      
+      #img,mask = img*2.-1., mask*2.-1.
+      batch = {}
+      batch["image"],batch["segmentation"]=img,mask
+      batch["orig_image"],batch["orig_segm"]=self.imgs, self.masks # debug output
+      return batch
+   
+   def make_patches(self):
+      ims, ms = [],[]
+      for n in range(len(self.names)):
+        print(f"appending image {n}")
+        self.imgs, self.masks = np.load(os.path.join(self.img_path, self.names[self.index[n]]+".npy")), np.load(os.path.join(self.mask_path, self.names[self.index[n]]+".npy"))
+        self.imgs = self.imgs[...,[3,2,1]]
+        self.imgs = np.clip(self.imgs, 0,1)
+        self.imgs, self.masks = torch.from_numpy(self.imgs).permute(2,0,1), torch.from_numpy(self.masks).permute(2,0,1).to(torch.float32)[None,1]
+        ims.append(self.imgs), ms.append(self.masks)
+      return ims, ms
+         
+      
+
+
+      
 
 class TestDataset(Dataset):
   def __init__(self, num_images=2000, size=64, img_ch=3, mask_ch=1,uncond="image", cond="class"):

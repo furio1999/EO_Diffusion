@@ -3,20 +3,19 @@ import torch.nn as nn
 from torchvision.datasets import MNIST
 from torchvision import transforms 
 from torchvision.utils import save_image
-import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from model import MNISTDiffusion
-from backbones.unet_openai import UNetModel
 from utils import ExponentialMovingAverage
 import os
 import math
 import argparse
 from data import *
 from pytorch_lightning.loggers import WandbLogger
-import wandb, pdb
 from tqdm import tqdm
+from diffusion.denoising_diffusion_pytorch import GaussianDiffusion
+from backbones.unet_openai import UNetModel
 
 
 
@@ -25,9 +24,8 @@ def parse_args():
     parser.add_argument('--lr',type = float ,default=0.001) # default 0.001
     parser.add_argument('--batch_size',type = int ,default=128)    
     parser.add_argument('--epochs',type = int,default=100)
-    parser.add_argument('--dir',type = str,help = 'directory',default='results/prova')
     parser.add_argument('--ckpt',type = str,help = 'define checkpoint path',default='')
-    parser.add_argument('--n_samples',type = int,help = 'define sampling amounts after every epoch trained',default=16)
+    parser.add_argument('--n_samples',type = int,help = 'define sampling amounts after every epoch trained',default=36)
     parser.add_argument('--model_base_dim',type = int,help = 'base dim of Unet',default=64)
     parser.add_argument('--timesteps',type = int,help = 'sampling steps of DDPM',default=1000)
     parser.add_argument('--model_ema_steps',type = int,help = 'ema model evaluation interval',default=10)
@@ -35,7 +33,6 @@ def parse_args():
     parser.add_argument('--log_freq',type = int,help = 'training log message printing frequence',default=10)
     parser.add_argument('--no_clip',action='store_true',help = 'set to normal sampling method without clip x_0 which could yield unstable samples')
     parser.add_argument('--cpu',action='store_true',help = 'cpu training')
-    parser.add_argument('--wandb',action='store_true',help = 'wandb logger usage')
     parser.add_argument('--num_classes',type = int,help = 'conditional training',default=0)
 
     args = parser.parse_args()
@@ -45,25 +42,13 @@ def parse_args():
 
 def main(args):
     device="cpu" if args.cpu else "cuda:0"
-    image_size = 64 # 256 - bs 8
     num_classes = args.num_classes if args.num_classes > 0 else None
-    in_channels,cond_channels,out_channels=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
-    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
-                    patch_overlap=0, length=0, num_patches=2000)
-    l,bs = len(train_dataloader), min(train_dataloader.batch_size,len(train_dataloader))
-
-    unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
-                     attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
-    model=MNISTDiffusion(unet,
-                timesteps=args.timesteps,
-                image_size=image_size,
-                in_channels=in_channels
-                ).to(device)
-    #trainable_params = sum(param.numel() for param in model.parameters() if param.requires_grad)
-    #trainable_params_unet = sum(param.numel() for param in model.model.parameters() if param.requires_grad)
-    #params_unet = len([param for param in model.model.diffusion_model.parameters()])
-    #layers_unet = [layer for layer in model.model.diffusion_model.children()]
+    cond_channels=0
+    train_dataloader,test_dataloader=create_mnist_dataloaders(batch_size=args.batch_size,image_size=28, num_workers=4)
+    unet = UNetModel(image_size=28,num_classes=num_classes,in_channels=1 + cond_channels,out_channels = 1,
+    model_channels=32,channel_mult=[2,4],attention_resolutions=[], num_res_blocks=1)
+    model=GaussianDiffusion(unet, timesteps=args.timesteps,
+                image_size=28,).to(device)
 
     #torchvision ema setting
     #https://github.com/pytorch/vision/blob/main/references/classification/train.py#L317
@@ -78,8 +63,6 @@ def main(args):
     #logger = WandbLogger(project="EO-minimal-diffusion", name=f"mnistdiffusion", log_model=True)
     #logger.experiment.define_metric("global_step")
     #logger.experiment.define_metric("train/*", step_metric="global_step")
-    if args.wandb: wandb.init(project="EO-minimal-diffusion")
-
 
     #load checkpoint
     if args.ckpt:
@@ -88,22 +71,16 @@ def main(args):
         model_ema.load_state_dict(ckpt["model_ema"])
         model.load_state_dict(ckpt["model"])
 
-    global_steps,best_loss=0,0.9
+    global_steps=0
     cond, y_test = None, torch.full((args.n_samples,),1).to(device) if args.num_classes>0 else None
-    dir = args.dir
-    os.makedirs(dir,exist_ok=True)
-    ckpt_best = os.path.join(dir, "best.pt") # do it into
     for i in range(args.epochs):
         model.train()
-        for j,(data) in (enumerate(train_dataloader)):
-            print(f"step {j}/{int(l)}")
-            image = data["image"]
+        for j,(image, target) in tqdm(enumerate(train_dataloader)):
             target = target.to(device) if y_test is not None else None
             cond = cond.to(device) if cond is not None else None
             noise=torch.randn_like(image).to(device)
             image=image.to(device)
-            pred=model(image,noise, cond=cond, y=target)
-            loss=loss_fn(pred,noise)
+            loss=model(image,noise).to(device)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -115,32 +92,23 @@ def main(args):
                 #logger.experiment.log({"train/loss": loss, "train/learning_rate": scheduler.get_last_lr()[-1]})
                 print("Epoch[{}/{}],Step[{}/{}],loss:{:.5f},lr:{:.5f}".format(i+1,args.epochs,j,len(train_dataloader),
                                                                     loss.detach().cpu().item(),scheduler.get_last_lr()[0]))
-            if args.wandb:
-                wandb.log({"loss":loss.detach().cpu().item()})
-                wandb.log({"lr":scheduler.get_last_lr()[0]})
-                
         ckpt={"model":model.state_dict(),
                 "model_ema":model_ema.state_dict()}
-        print_idx = 0 if i<10 else i%(10)
+        dir="results/lucidrains"
+        print_idx = i if i<10 else i%(args.epochs//25)
         ckpt_path = os.path.join(dir, "steps_{:0>8}.pt".format(global_steps))
         img_path = os.path.join(dir, "steps_{:0>8}.png".format(global_steps))
         cond_path = os.path.join(dir, "steps_{:0>8}_cond.png".format(global_steps))
+        os.makedirs(dir,exist_ok=True)
 
         model_ema.eval()
         cond = cond[:args.n_samples] if cond is not None else None
-        # put cond[randn_idx]*n_samples
-        if (print_idx==0 or print_idx==args.epochs-1):
-          samples=model_ema.module.sampling(args.n_samples,clipped_reverse_diffusion=not args.no_clip,device=device, cond=cond, y=y_test)
-          samples = F.adjust_brightness(samples, 3) if samples.mean()<0.2 else samples
-          print(f"saving in {img_path}, idx {print_idx} epoch {i}")
+        samples=model_ema.module.sample(batch_size=args.n_samples) # put cond[randn_idx]*n_samples
+        if print_idx == i or print_idx==0 or print_idx==args.epochs-1:
+          print(f"savin in {img_path}, idx {print_idx} epoch {i}")
           save_image(samples,img_path,nrow=int(math.sqrt(args.n_samples)))
           save_image(cond,cond_path,nrow=int(math.sqrt(args.n_samples))) if cond is not None else print()
-          torch.save(ckpt,ckpt_path)
-        if loss < best_loss: 
-            torch.save(ckpt, ckpt_best)
-            best_loss = loss.detach().cpu().item()
-
-    if args.wandb: wandb.finish()
+          torch.save(ckpt, ckpt_path)
 
 if __name__=="__main__":
     args=parse_args()

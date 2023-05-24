@@ -1,0 +1,15 @@
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+RuntimeError: Error(s) in loading state_dict for MNISTDiffusion:
+        Missing key(s) in state_dict: "model.input_blocks.3.1.norm.weight", "model.input_blocks.3.1.norm.bias", "model.input_blocks.3.1.qkv.weight",        
+"model.input_blocks.3.1.qkv.bias", "model.input_blocks.3.1.proj_out.weight", "model.input_blocks.3.1.proj_out.bias", "model.output_blocks.1.1.conv.weight", 
+"model.output_blocks.1.1.conv.bias", "model.output_blocks.4.1.norm.weight", "model.output_blocks.4.1.norm.bias", "model.output_blocks.4.1.qkv.weight",      
+"model.output_blocks.4.1.qkv.bias", "model.output_blocks.4.1.proj_out.weight", "model.output_blocks.4.1.proj_out.bias",
+"model.output_blocks.5.1.norm.weight", "model.output_blocks.5.1.norm.bias", "model.output_blocks.5.1.qkv.weight", "model.output_blocks.5.1.qkv.bias",       
+"model.output_blocks.5.1.proj_out.weight", "model.output_blocks.5.1.proj_out.bias", "model.output_blocks.5.2.conv.weight",
+"model.output_blocks.5.2.conv.bias".
+        Unexpected key(s) in state_dict: "model.input_blocks.7.1.norm.weight", "model.input_blocks.7.1.norm.bias", "model.input_blocks.7.1.qkv.weight",     
+"model.input_blocks.7.1.qkv.bias", "model.input_blocks.7.1.proj_out.weight", "model.input_blocks.7.1.proj_out.bias", "model.output_blocks.0.1.norm.weight", 
+"model.output_blocks.0.1.norm.bias", "model.output_blocks.0.1.qkv.weight", "model.output_blocks.0.1.qkv.bias", "model.output_blocks.0.1.proj_out.weight",   
+"model.output_blocks.0.1.proj_out.bias", "model.output_blocks.1.2.conv.weight", "model.output_blocks.1.2.conv.bias", "model.output_blocks.1.1.norm.weight", 
+"model.output_blocks.1.1.norm.bias", "model.output_blocks.1.1.qkv.weight", "model.output_blocks.1.1.qkv.bias", "model.output_blocks.1.1.proj_out.weight",   
+"model.output_blocks.1.1.proj_out.bias", "model.output_blocks.5.1.conv.weight", "model.output_blocks.5.1.conv.bias".

@@ -9,7 +9,17 @@ from torchvision import datasets, transforms
 from torch import Generator
 from torch.utils.data import random_split
 #os.sys.path.append("../EO-Diffusion/scripts")
-from data_load import InriaDataset, TestDataset
+from data_load import *
+from torch import nn
+
+class MyTransform(nn.Module):
+    def __init__(self, transforms):
+        super().__init__()
+        self.transforms=transforms
+    def __call__(self,imgs):
+        t = self.transforms
+        return [t(img) for img in imgs]
+
 
 def create_mnist_dataloaders(batch_size,image_size=28,num_workers=4):
     
@@ -17,12 +27,12 @@ def create_mnist_dataloaders(batch_size,image_size=28,num_workers=4):
                                     transforms.ToTensor(),\
                                     transforms.Normalize([0.5],[0.5])]) #[0,1] to [-1,1]
 
-    train_dataset=datasets.MNIST(root="./mnist_data",\
+    train_dataset=myMNIST(root="../data/mnist_data",\
                         train=True,\
                         download=True,\
                         transform=preprocess
                         )
-    test_dataset=datasets.MNIST(root="./mnist_data",\
+    test_dataset=myMNIST(root="../data/mnist_data",\
                         train=False,\
                         download=True,\
                         transform=preprocess
@@ -51,20 +61,32 @@ def create_cifar10_dataloaders(batch_size,image_size=32,num_workers=4):
     return DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
             DataLoader(test_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers)
 
-def create_inria_dataloaders(batch_size, image_size=64, patch_overlap=0.5, num_workers=0, val_split = 0.15, SEED=4097, device="cpu"):
-        preprocess=[
-                                   transforms.RandomHorizontalFlip(),
-                                   transforms.Normalize([0.5],[0.5]),
-                                   transforms.CenterCrop(size=image_size)
-                                   ]
+def create_inria_dataloaders(batch_size, size=64, patch_overlap=0.5, num_workers=0, val_split = 0.15, SEED=4097, test=False, device="cpu", length=3, num_patches=200,
+return_dataset = False):
+        preprocess=transforms.Compose([
+                                   transforms.RandomHorizontalFlip(),transforms.RandomVerticalFlip(), #grayscale gives problems
+                                   #A.Normalize([0.5],[0.5]),
+                                   ]) if not test or return_dataset else transforms.Compose([transforms.CenterCrop(size=size)])
         print("loading dataset...")
-        dataset = InriaDataset(path = "../EO-Diffusion/data/AerialImageDataset", transforms=preprocess, compact=False, size = image_size,
-        ch_last=False,img_ch=3, mask_ch=1, cond="class", uncond="image", num_patches=2000, patch_overlap=patch_overlap, load_from_disk=False)
+        dataset = InriaDataset(path = "../EO-Diffusion/data/AerialImageDataset", transforms=preprocess, compact=True, size = size,length=length,
+        ch_last=False,img_ch=3, mask_ch=1, uncond="image", num_patches=num_patches, patch_overlap=patch_overlap, load_from_disk=False, use_int=return_dataset)
 
         train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
+        if return_dataset: return train_ds, test_ds
         print("Loaded!!")
         return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
                 DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
+
+def create_cloud_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=4097, return_dataset=False, test=False, **kwargs):
+            preprocess=transforms.Compose([transforms.RandomHorizontalFlip(),transforms.RandomVerticalFlip(),
+                                            #A.Normalize([0.5],[0.5]), and brightness
+]) if not test else None
+            dataset = CloudMaskDataset(transforms=preprocess,**kwargs)
+            train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
+            if return_dataset: return train_ds, test_ds
+            return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
+                DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
+
 
 def create_test_dataloaders(batch_size, image_size=64, num_workers=0, val_split = 0.15, SEED=4097, num_images=20):
         preprocess=[

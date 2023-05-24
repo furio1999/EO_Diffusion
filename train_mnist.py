@@ -13,6 +13,7 @@ import math
 import argparse
 from data import *
 from pytorch_lightning.loggers import WandbLogger
+from backbones.unet_openai import UNetModel
 
 
 
@@ -42,14 +43,17 @@ def main(args):
     device="cpu" if args.cpu else "cuda:0"
     train_dataloader,test_dataloader=create_mnist_dataloaders(batch_size=args.batch_size,image_size=28)
     num_classes = args.num_classes if args.num_classes > 0 else None
+    image_size = 28
+    in_channels,cond_channels,out_channels=1,0,1
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=32,[2,4],[],1,1
     y_test = torch.full((args.n_samples,),2).to(device) if args.num_classes>0 else None # mnist cond result obtained without specifying the exact num_classes, only putting target=0...9
-    model=MNISTDiffusion(timesteps=args.timesteps,
-                image_size=28,
-                num_classes = num_classes,
-                in_channels=1,
-                out_channels = 1,
-                base_dim=args.model_base_dim,
-                dim_mults=[2,4]).to(device)
+    unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
+                     attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
+    model=MNISTDiffusion(unet,
+                timesteps=args.timesteps,
+                image_size=image_size,
+                in_channels=in_channels
+                ).to(device)
 
     #torchvision ema setting
     #https://github.com/pytorch/vision/blob/main/references/classification/train.py#L317
@@ -80,6 +84,7 @@ def main(args):
             noise=torch.randn_like(image).to(device)
             image, target=image.to(device), target.to(device)
             pred=model(image,noise, y=target)
+            breakpoint()
             loss=loss_fn(pred,noise)
             loss.backward()
             optimizer.step()

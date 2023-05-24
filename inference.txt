@@ -1,0 +1,9 @@
+python inference.py --n_samples 4 --n_iter 1 --model_base_dim 128 --ckpt results\vienna_segm\steps_00008140.pt
+python inference.py --batch_size 1 --ckpt results\inriafull\steps_00213381.pt --outdir results\cloud_inpaint --cond_type "sum"
+python inference.py --batch_size 4 --n_samples 4 --ckpt results\inria_attn\best.pt --outdir results\inria_attn
+python inference.py --batch_size 1  --ckpt results\clouds\train_attn\best.pt --outdir results\cloud_inpaint_sen --cond_type "sum"
+Inriafull-->{'inception_score_mean': 6.525376649460687, 'inception_score_std': 0.03870544156724096, 'frechet_inception_distance': 199.67656914996158} 80 samples full dataset
+{'inception_score_mean': nan, 'inception_score_std': nan, 'frechet_inception_distance': 337.61654352015233}80 samples 10 items dataset
+python inference.py --model_base_dim 128 --ckpt results\inria_class_cond\steps_00035865.pt --num_classes 5
+# merge pretrained model in my model
+python inference.py --model_base_dim 128 --ckpt logs\model.ckpt

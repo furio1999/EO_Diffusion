@@ -44,13 +44,13 @@ def parse_args():
 
 
 def main(args):
-    device="cpu" if args.cpu else "cuda:0"
+    device="cpu" if args.cpu else "cuda:1"
     image_size = 64 # 256 - bs 8
     num_classes = args.num_classes if args.num_classes > 0 else None
     in_channels,cond_channels,out_channels=3,0,3
     base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
-    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
-                    patch_overlap=0, length=0, num_patches=2000)
+    train_dataloader,test_dataloader=create_cloud_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
+                    ratio=0.5, length=-1, num_patches=2000, percents=[99,0,70])
     l,bs = len(train_dataloader), min(train_dataloader.batch_size,len(train_dataloader))
 
     unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
