@@ -123,7 +123,7 @@ def main(args):
         ckpt={"model":model.state_dict(),
                 "model_ema":model_ema.state_dict()}
         print_idx = 0 if i<10 else i%(10)
-        ckpt_path = os.path.join(dir, "steps_{:0>8}.pt".format(global_steps)) # ckpt path
+        ckpt_path = os.path.join(dir, "steps_{:0>8}.pt".format(global_steps))
         img_path = os.path.join(dir, "steps_{:0>8}.png".format(global_steps))
         cond_path = os.path.join(dir, "steps_{:0>8}_cond.png".format(global_steps))
 
