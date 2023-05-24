@@ -92,7 +92,8 @@ def main(args):
     cond, y_test = None, torch.full((args.n_samples,),1).to(device) if args.num_classes>0 else None
     dir = args.dir
     os.makedirs(dir,exist_ok=True)
-    ckpt_best = os.path.join(dir, "best.pt") # do it into
+    os.makedirs(os.path.join(dir,"logs"),exist_ok=True)
+    ckpt_best = os.path.join(dir, "logs/best.pt") # do it into
     for i in range(args.epochs):
         model.train()
         for j,(data) in (enumerate(train_dataloader)):
