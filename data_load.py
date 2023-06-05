@@ -7,6 +7,7 @@ import torchvision.transforms.functional as F
 import pytorch_lightning as pl
 from tqdm import tqdm
 from einops import rearrange
+from utils import *
 
 from packaging import version
 from omegaconf import OmegaConf 
@@ -399,10 +400,10 @@ class CloudMaskDataset(Dataset):
    def __init__(self, root="../data/Sentinel-2-CMC", classes=['agricultural', 'urban/developed', 'hills/mountains'], percents=[50,25,70], 
    size=64, num_patches=200, ratio=0, length=3, load_from_disk=True,
                 transforms=None):
-      self.orig_size, self.step = 1022, int((1-ratio)*size)
-      self.num_patches, self.size = min(num_patches, (int(self.orig_size/self.step))**2), size # np_I*np_J
+      self.orig_size, self.step = (1022,1022), int((1-ratio)*size)
+      self.np_I, self.np_J = int((self.orig_size[0]-size)/self.step+1),int((self.orig_size[1]-size)/self.step+1) # may be the opposite
+      self.num_patches, self.size = min(num_patches, (self.np_J*self.np_I)), size # np_I*np_J
       self.load_from_disk = load_from_disk
-      self.np_J = int(self.orig_size/self.step)
       self.transforms, self.eq = transforms, torchvision.transforms.RandomEqualize(p=0.7)
       self.img_path, self.mask_path = os.path.join(root,"subscenes"), os.path.join(root,"masks")
       db = pd.read_csv(root + "/classification_tags.csv", index_col="index")
@@ -439,7 +440,8 @@ class CloudMaskDataset(Dataset):
       #self.imgs = self.imgs.clip(0.,1.)
 
       idx_i, idx_j=int(npatches/self.np_J)*self.step, (npatches%self.np_J)*self.step
-      img,mask = self.imgs[:,idx_i:idx_i+self.step, idx_j:idx_j+self.step], self.masks[:,idx_i:idx_i+self.step, idx_j:idx_j+self.step]
+      #self.step original
+      img,mask = self.imgs[:,idx_i:idx_i+self.size, idx_j:idx_j+self.size], self.masks[:,idx_i:idx_i+self.size, idx_j:idx_j+self.size]
       #img = self.eq((img*255).to(torch.uint8))/255
       #if img.mean() < 0.2: img = F.adjust_brightness(img, 3)
 
@@ -463,9 +465,24 @@ class CloudMaskDataset(Dataset):
         self.imgs, self.masks = torch.from_numpy(self.imgs).permute(2,0,1), torch.from_numpy(self.masks).permute(2,0,1).to(torch.float32)[None,1]
         ims.append(self.imgs), ms.append(self.masks)
       return ims, ms
-         
-      
+   
+class OSCD(Dataset):
+  def __init__(self,pw=64,ph=64,sw=32,sh=32,mnh=10,mnw=10,mxw=50,mxh=50, clip=0.3, transform=None):
+    self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip)
+    self.img_names = glob.glob(os.path.join(self.path,"*rgb*"))
+    self.label_names = glob.glob(os.path.join(self.path, '*lbl*'))
+    self.to_tensor = torchvision.transforms.ToTensor()
 
+  def __len__(self):
+      return len(self.img_names)
+    
+  def __getitem__(self,n):
+      batch = {}
+      img, label = Image.open(self.img_names[n]), Image.open(self.label_names[n]).convert("L")
+      img, label = self.to_tensor(img)[:-1], self.to_tensor(label) # dimensione giusta, float32?
+      img = img/255
+      batch["image"], batch["segmentation"] = img, label
+      return batch
 
       
 

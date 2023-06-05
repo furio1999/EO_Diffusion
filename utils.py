@@ -14,6 +14,28 @@ def show(imgs):
         axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
     plt.show()
 
+def make_label(shape, mnw, mnh, mxw, mxh):
+
+    label = np.zeros(shape)
+    w, h = shape 
+
+    mnw = int(w*mnw/100)
+    mxw = int(w*mxw/100)
+    mnh = int(h*mnh/100)
+    mxh = int(h*mxh/100)
+
+    ws = np.random.randint(mnw, mxw, 1)[0]
+    hs = np.random.randint(mnh, mxh, 1)[0]
+
+    x = np.random.randint(ws, w-ws, 1)[0]
+    y = np.random.randint(hs, h-hs, 1)[0]
+
+    #print(x,y,ws,hs)
+
+    label[x:x+ws, y:y+hs] = torch.ones((ws,hs))
+
+    return label
+
 #torchvision ema implementation
 #https://github.com/pytorch/vision/blob/main/references/classification/utils.py#L159
 class ExponentialMovingAverage(torch.optim.swa_utils.AveragedModel):

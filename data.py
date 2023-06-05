@@ -87,6 +87,16 @@ def create_cloud_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=409
             return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
                 DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
 
+def create_oscd_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=4097, return_dataset=False, test=False, **kwargs):
+            preprocess=transforms.Compose([transforms.RandomHorizontalFlip(),transforms.RandomVerticalFlip(),
+                                            #A.Normalize([0.5],[0.5]), and brightness
+]) if not test else None
+            dataset = OSCD(transforms=preprocess,**kwargs)
+            train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
+            if return_dataset: return train_ds, test_ds
+            return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
+                DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
+
 
 def create_test_dataloaders(batch_size, image_size=64, num_workers=0, val_split = 0.15, SEED=4097, num_images=20):
         preprocess=[

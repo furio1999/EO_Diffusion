@@ -7,7 +7,7 @@ import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
-from model import MNISTDiffusion
+from diffusion.model import MNISTDiffusion
 from backbones.unet_openai import UNetModel
 from utils import ExponentialMovingAverage
 import os
@@ -50,7 +50,7 @@ def main(args):
     in_channels,cond_channels,out_channels=3,0,3
     base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
     train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
-                    patch_overlap=0, length=0, num_patches=2000)
+                    patch_overlap=0, length=1, num_patches=2000)
     l,bs = len(train_dataloader), min(train_dataloader.batch_size,len(train_dataloader))
 
     unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
@@ -91,9 +91,9 @@ def main(args):
     global_steps,best_loss=0,0.9
     cond, y_test = None, torch.full((args.n_samples,),1).to(device) if args.num_classes>0 else None
     dir = args.dir
-    os.makedirs(dir,exist_ok=True)
-    os.makedirs(os.path.join(dir,"logs"),exist_ok=True)
-    ckpt_best = os.path.join(dir, "logs/best.pt") # do it into
+    dir_ckpt = "logs/" + os.path.split(dir)[1]
+    os.makedirs(dir,exist_ok=True), os.makedirs(dir_ckpt, exist_ok=True)
+    ckpt_best = os.path.join(dir_ckpt, "best.pt") # do it into
     for i in range(args.epochs):
         model.train()
         for j,(data) in (enumerate(train_dataloader)):
@@ -123,7 +123,7 @@ def main(args):
         ckpt={"model":model.state_dict(),
                 "model_ema":model_ema.state_dict()}
         print_idx = 0 if i<10 else i%(10)
-        ckpt_path = os.path.join(dir, "steps_{:0>8}.pt".format(global_steps))
+        ckpt_path = os.path.join(dir_ckpt, "steps_{:0>8}.pt".format(global_steps))
         img_path = os.path.join(dir, "steps_{:0>8}.png".format(global_steps))
         cond_path = os.path.join(dir, "steps_{:0>8}_cond.png".format(global_steps))
 
@@ -132,6 +132,7 @@ def main(args):
         # put cond[randn_idx]*n_samples
         if (print_idx==0 or print_idx==args.epochs-1):
           samples=model_ema.module.sampling(args.n_samples,clipped_reverse_diffusion=not args.no_clip,device=device, cond=cond, y=y_test)
+          samples = samples.clip(0,1) if image.min()>=0 else (samples+1.)/2 #samples = (samples+1.)/2. only if train data is in (-1,1)
           samples = F.adjust_brightness(samples, 3) if samples.mean()<0.2 else samples
           print(f"saving in {img_path}, idx {print_idx} epoch {i}")
           save_image(samples,img_path,nrow=int(math.sqrt(args.n_samples)))

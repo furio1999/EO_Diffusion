@@ -51,15 +51,15 @@ def parse_args():
 
 def main(args):
     to_pil = transforms.ToPILImage()
-    device="cpu" if args.cpu else "cuda:1"
+    device="cpu" if args.cpu else "cuda:0"
     torch.cuda.device(device)
     ngpu = torch.cuda.device_count()
     image_size = 64
     in_channels,cond_channels,out_channels=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,4,8],[],1,1
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
+    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
+                    patch_overlap=0.5, length=-1, num_patches=2000)
     num_classes = args.num_classes if args.num_classes > 0 else None
-    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size,num_workers=4*ngpu, test=False, size=image_size, length=-1, num_patches=2000,
-        )
     unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
                      attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
     model=MNISTDiffusion(unet,
@@ -92,9 +92,12 @@ def main(args):
     for j,(data) in enumerate(test_dataloader):
         print(f"data {j}")
         image, cond = data["image"], 1-data["segmentation"] if args.cond_type is not None else None  # data[input_key], data[cond_key]
-        if args.random_label: cond = make_label((args.image_size, args.image_size), 10, 10, 40, 40)
+        if args.random_label: 
+            cond = make_label((image_size, image_size), 10, 10, 40, 40)
+            cond = torch.from_numpy(cond).to(image.dtype)[None,None] # check coherence with NN weights
         if cond is not None:
             if cond.mean()>=0.9 or cond.mean()<=0.1: continue # original bounds 0.8 and 0.2. Do it at data level, no continue statement here
+        
         if args.cond_type == "sum": 
             cond=torch.cat([image,cond],1)
             image = image.to(device)
@@ -142,7 +145,7 @@ def main(args):
         n = n+1
         
         ssim_avg, psnr_avg = ssim/n, psnr/n # correct if len is referred to num batches
-        print("metrics: ",ssim, psnr)
+        print("metrics: ",ssim_avg, psnr_avg)
         if args.metrics:
             with open(os.path.join(dir, "metrics.txt"), "w") as f:
                 f.write(f"ssim: {ssim_avg}")

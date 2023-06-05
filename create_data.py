@@ -118,14 +118,14 @@ if __name__ == "__main__":
         tester = tester()
         preprocess=transforms.Compose([ transforms.RandomHorizontalFlip(p=0.), #A.Normalize([0.5],[0.5]),
                                    ])
-        ds = CloudMaskDataset(size=1022, num_patches=200, length=-1, percents=[99,0,0], 
-        )
+        ds = OSCD()
+        breakpoint()
         print(len(ds))
-        eq = transforms.RandomEqualize(p=1.)
         for i in range(1000):
           print(i)
           img, cond = ds[i]["image"], ds[i]["segmentation"]
+          breakpoint()
           im, m = ds[i]["orig_image"], ds[i]["orig_segm"]
           if im.mean() < 0.2: im = F.adjust_brightness(im,3)
           #show(img), show(cond)
-          show(im), show(m)
+          #show(im), show(m)
