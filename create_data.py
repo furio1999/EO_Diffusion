@@ -9,6 +9,7 @@ from einops import rearrange
 from data import *
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as F
+from PIL import Image
 """
 path="../EO-Diffusion/data/AerialImageDataset"
 vocab_images, vocab_gt = {}, {}
@@ -114,18 +115,21 @@ class tester():
         plt.plot(hist[1].bin_edges[:-1], hist[1].hist, color="g")
         plt.plot(hist[2].bin_edges[:-1], hist[2].hist, color="b")
 
-if __name__ == "__main__":
-        tester = tester()
-        preprocess=transforms.Compose([ transforms.RandomHorizontalFlip(p=0.), #A.Normalize([0.5],[0.5]),
+def test_oscd():
+        preprocess=transforms.Compose([ transforms.RandomHorizontalFlip(), transforms.RandomHorizontalFlip(), 
+                                     transforms.RandomAdjustSharpness(p=0.3, sharpness_factor=0.3),transforms.RandomSolarize(threshold=0.5, p=0.1), transforms.RandomAdjustSharpness(p=0.3, sharpness_factor=1.5),
+                                     #transforms.Normalize(mean=(0.5), std=(0.5))
                                    ])
-        ds = OSCD()
-        breakpoint()
+        norm = transforms.Normalize(mean=(0.5), std=(0.5))
+        ds = OSCD(transform=preprocess)
         print(len(ds))
         for i in range(1000):
           print(i)
-          img, cond = ds[i]["image"], ds[i]["segmentation"]
+          img, cond = ds[i]["image"], 1-ds[i]["segmentation"]
           breakpoint()
-          im, m = ds[i]["orig_image"], ds[i]["orig_segm"]
-          if im.mean() < 0.2: im = F.adjust_brightness(im,3)
-          #show(img), show(cond)
-          #show(im), show(m)
+          if cond.min() < 0: img, cond = (img+1.)/2., (cond+1.)/2.
+          show(img), show(img*cond)   
+
+if __name__ == "__main__":
+      test_oscd()
+     

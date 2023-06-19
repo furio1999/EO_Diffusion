@@ -467,11 +467,14 @@ class CloudMaskDataset(Dataset):
       return ims, ms
    
 class OSCD(Dataset):
-  def __init__(self,pw=64,ph=64,sw=32,sh=32,mnh=10,mnw=10,mxw=50,mxh=50, clip=0.3, transform=None):
+  def __init__(self,pw=64,ph=64,sw=32,sh=32,mnh=10,mnw=10,mxw=50,mxh=50, clip=0.3, transform=None, length=None):
     self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip)
     self.img_names = glob.glob(os.path.join(self.path,"*rgb*"))
     self.label_names = glob.glob(os.path.join(self.path, '*lbl*'))
     self.to_tensor = torchvision.transforms.ToTensor()
+    self.transforms, self.normalize = transform, torchvision.transforms.Normalize(mean=(0.5), std=(0.5))
+    if length is not None:
+       self.img_names, self.label_names = self.img_names[:length],self.label_names[:length]
 
   def __len__(self):
       return len(self.img_names)
@@ -479,8 +482,13 @@ class OSCD(Dataset):
   def __getitem__(self,n):
       batch = {}
       img, label = Image.open(self.img_names[n]), Image.open(self.label_names[n]).convert("L")
-      img, label = self.to_tensor(img)[:-1], self.to_tensor(label) # dimensione giusta, float32?
-      img = img/255
+      img, label = self.to_tensor(img), self.to_tensor(label) # :-1
+      if img.shape[0]==4: img = img[:-1] # RGBA image
+      #img = img/255
+      if self.transforms is not None:
+        #out = self.transforms(torch.cat((img,label),0))
+        #img,label = out[:3], out[3][None]
+        img = self.transforms(img)
       batch["image"], batch["segmentation"] = img, label
       return batch
 

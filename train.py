@@ -6,7 +6,7 @@ from torchvision.utils import save_image
 import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import *
 from diffusion.model import MNISTDiffusion
 from backbones.unet_openai import UNetModel
 from utils import ExponentialMovingAverage
@@ -17,6 +17,7 @@ from data import *
 from pytorch_lightning.loggers import WandbLogger
 import wandb, pdb
 from tqdm import tqdm
+from train_utils import KeyframeLR
 
 
 
@@ -48,9 +49,9 @@ def main(args):
     image_size = 64 # 256 - bs 8
     num_classes = args.num_classes if args.num_classes > 0 else None
     in_channels,cond_channels,out_channels=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
-    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
-                    patch_overlap=0, length=1, num_patches=2000)
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
+    train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4,
+                    )
     l,bs = len(train_dataloader), min(train_dataloader.batch_size,len(train_dataloader))
 
     unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
@@ -60,7 +61,8 @@ def main(args):
                 image_size=image_size,
                 in_channels=in_channels
                 ).to(device)
-    #trainable_params = sum(param.numel() for param in model.parameters() if param.requires_grad)
+    trainable_params = sum(param.numel() for param in model.parameters() if param.requires_grad)
+    print(f"Diffusion with {trainable_params/1e06} M params")
     #trainable_params_unet = sum(param.numel() for param in model.model.parameters() if param.requires_grad)
     #params_unet = len([param for param in model.model.diffusion_model.parameters()])
     #layers_unet = [layer for layer in model.model.diffusion_model.children()]
@@ -73,7 +75,16 @@ def main(args):
     model_ema = ExponentialMovingAverage(model, device=device, decay=1.0 - alpha)
 
     optimizer=AdamW(model.parameters(),lr=args.lr)
-    scheduler=OneCycleLR(optimizer,args.lr,total_steps=args.epochs*len(train_dataloader),pct_start=0.25,anneal_strategy='cos')
+    max_steps, posmax, end_lr = len(train_dataloader)*args.epochs, 10*len(train_dataloader), 1e-06
+    scheduler = KeyframeLR(optimizer=optimizer, units="steps",
+    frames=[
+        {"position": 0, "lr": 1e-05},
+        {"transition": "cos"},
+        {"position": posmax, "lr": args.lr},
+        {"transition": lambda last_lr, sf, ef, pos, *_: args.lr * math.exp(-3*(pos-posmax)/(max_steps-posmax))},
+    ],
+    end=max_steps,
+)
     loss_fn=nn.MSELoss(reduction='mean')
     #logger = WandbLogger(project="EO-minimal-diffusion", name=f"mnistdiffusion", log_model=True)
     #logger.experiment.define_metric("global_step")
@@ -94,6 +105,7 @@ def main(args):
     dir_ckpt = "logs/" + os.path.split(dir)[1]
     os.makedirs(dir,exist_ok=True), os.makedirs(dir_ckpt, exist_ok=True)
     ckpt_best = os.path.join(dir_ckpt, "best.pt") # do it into
+    l = len(train_dataloader)
     for i in range(args.epochs):
         model.train()
         for j,(data) in (enumerate(train_dataloader)):
@@ -111,7 +123,7 @@ def main(args):
             scheduler.step()
             if global_steps%args.model_ema_steps==0:
                 model_ema.update_parameters(model)
-            global_steps+=1
+            global_steps+=1 # = (i+1)*(j+1)
             if j%args.log_freq==0:
                 #logger.experiment.log({"train/loss": loss, "train/learning_rate": scheduler.get_last_lr()[-1]})
                 print("Epoch[{}/{}],Step[{}/{}],loss:{:.5f},lr:{:.5f}".format(i+1,args.epochs,j,len(train_dataloader),
@@ -119,28 +131,30 @@ def main(args):
             if args.wandb:
                 wandb.log({"loss":loss.detach().cpu().item()})
                 wandb.log({"lr":scheduler.get_last_lr()[0]})
-                
-        ckpt={"model":model.state_dict(),
-                "model_ema":model_ema.state_dict()}
-        print_idx = 0 if i<10 else i%(10)
-        ckpt_path = os.path.join(dir_ckpt, "steps_{:0>8}.pt".format(global_steps))
-        img_path = os.path.join(dir, "steps_{:0>8}.png".format(global_steps))
-        cond_path = os.path.join(dir, "steps_{:0>8}_cond.png".format(global_steps))
 
-        model_ema.eval()
-        cond = cond[:args.n_samples] if cond is not None else None
-        # put cond[randn_idx]*n_samples
-        if (print_idx==0 or print_idx==args.epochs-1):
-          samples=model_ema.module.sampling(args.n_samples,clipped_reverse_diffusion=not args.no_clip,device=device, cond=cond, y=y_test)
-          samples = samples.clip(0,1) if image.min()>=0 else (samples+1.)/2 #samples = (samples+1.)/2. only if train data is in (-1,1)
-          samples = F.adjust_brightness(samples, 3) if samples.mean()<0.2 else samples
-          print(f"saving in {img_path}, idx {print_idx} epoch {i}")
-          save_image(samples,img_path,nrow=int(math.sqrt(args.n_samples)))
-          save_image(cond,cond_path,nrow=int(math.sqrt(args.n_samples))) if cond is not None else print()
-          torch.save(ckpt,ckpt_path)
-        if loss < best_loss: 
-            torch.save(ckpt, ckpt_best)
-            best_loss = loss.detach().cpu().item()
+            if loss < best_loss: 
+                torch.save(ckpt, ckpt_best)
+                best_loss = loss.detach().cpu().item()
+                
+            ckpt={"model":model.state_dict(),
+                    "model_ema":model_ema.state_dict()}
+            
+            print_idx = global_steps%200 if global_steps<1000 else (global_steps)%(1000)
+            ckpt_path = os.path.join(dir_ckpt, "steps_{:0>8}.pt".format(global_steps))
+            img_path = os.path.join(dir, "steps_{:0>8}.png".format(global_steps))
+            cond_path = os.path.join(dir, "steps_{:0>8}_cond.png".format(global_steps))
+
+            model_ema.eval()
+            cond = cond[:args.n_samples] if cond is not None else None
+            # put cond[randn_idx]*n_samples
+            if (print_idx==0):
+                samples=model_ema.module.sampling(args.n_samples,clipped_reverse_diffusion=not args.no_clip,device=device, cond=cond, y=y_test)
+                samples = samples.clip(0,1) if image.min()>=0 else (samples+1.)/2 #samples = (samples+1.)/2. only if train data is in (-1,1)
+                samples = F.adjust_brightness(samples, 3) if samples.mean()<0.2 else samples
+                print(f"saving in {img_path}, idx {print_idx} epoch {i}")
+                save_image(samples,img_path,nrow=int(math.sqrt(args.n_samples)))
+                save_image(cond,cond_path,nrow=int(math.sqrt(args.n_samples))) if cond is not None else print()
+                torch.save(ckpt,ckpt_path)
 
     if args.wandb: wandb.finish()
 

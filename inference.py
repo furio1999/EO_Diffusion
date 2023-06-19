@@ -56,10 +56,10 @@ def main(args):
     ngpu = torch.cuda.device_count()
     image_size = 64
     in_channels,cond_channels,out_channels=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,4,8],[],1,1
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
     num_classes = args.num_classes if args.num_classes > 0 else None
-    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size,num_workers=4*ngpu, test=False, size=image_size, length=-1, num_patches=2000,
-        )
+    train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4,test=True,
+                    )
     unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
                      attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
     model=MNISTDiffusion(unet,
@@ -138,11 +138,11 @@ def main(args):
                 save_image(samples[i],samples_path)
 
         samples = F.adjust_brightness(samples, 3) if samples.mean()<0.2 else samples
-        save_image(samples,img_path,nrow=int(math.sqrt(args.batch_size))) if args.save else print()
+        if args.save: save_image(samples,img_path,nrow=int(math.sqrt(args.batch_size)))
         n = n+1
         
         ssim_avg, psnr_avg = ssim/n, psnr/n # correct if len is referred to num batches
-        print("metrics: ",ssim, psnr)
+        print("metrics: ",ssim_avg, psnr_avg)
         if args.metrics:
             with open(os.path.join(dir, "metrics.txt"), "w") as f:
                 f.write(f"ssim: {ssim_avg}")

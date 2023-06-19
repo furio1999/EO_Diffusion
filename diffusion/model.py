@@ -11,13 +11,14 @@ import torchvision.transforms.functional as F
 
 class MNISTDiffusion(nn.Module):
     def __init__(self, model, image_size,in_channels, time_embedding_dim=256,timesteps=1000,
-    cond_type = None, ):
+    cond_type = None, device = "cpu"):
         super().__init__()
         print("loading model...")
         self.timesteps=timesteps
         self.in_channels=in_channels
         self.image_size=image_size
         self.cond_type = cond_type
+        self.device = device
 
         betas=self._cosine_variance_schedule(timesteps)
 

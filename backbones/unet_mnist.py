@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 
+class TinyModel(nn.Module):
+    pass
+
 
 class ChannelShuffle(nn.Module):
     def __init__(self,groups):

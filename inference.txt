@@ -6,3 +6,5 @@ Inriafull-->{'inception_score_mean': 6.525376649460687, 'inception_score_std': 0
 python inference.py --model_base_dim 128 --ckpt results\inria_class_cond\steps_00035865.pt --num_classes 5
 # merge pretrained model in my model
 python inference.py --model_base_dim 128 --ckpt logs\model.ckpt
+python inference.py --batch_size 1  --ckpt logs\oscd\best.pt --outdir results\oscd_cloud_thick --cond_type sum
+python inference2.py --batch_size 1  --ckpt results\inria_attn\best.pt --outdir results\inria_attn_ddim --sampler ddim --save

@@ -18,8 +18,7 @@ from data import *
 from pytorch_lightning.loggers import WandbLogger
 from PIL import Image
 from backbones.unet_openai import UNetModel
-
-
+from diffusion.ddim import DDIMSampler
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training MNISTDiffusion")
@@ -41,6 +40,7 @@ def parse_args():
     parser.add_argument('--wandb',action='store_true',help = 'wandb logger usage')
     parser.add_argument('--num_classes',type = int,help = 'conditional training',default=0)
     parser.add_argument('--cond_type',type = str,help = 'cond type',default=None)
+    parser.add_argument('--sampler',type = str,help = 'sampler',default="ddpm")
     parser.add_argument('--samples_fid',action='store_true',help = 'cpu training')
 
     args = parser.parse_args()
@@ -51,23 +51,26 @@ def parse_args():
 
 def main(args):
     to_pil = transforms.ToPILImage()
-    device="cpu" if args.cpu else "cuda:0"
+    device="cpu" if args.cpu else "cuda:1"
     torch.cuda.device(device)
     ngpu = torch.cuda.device_count()
     image_size = 64
-    in_channels,cond_channels,out_channels=3,0,3
+    in_ch,cond_channels,out_ch=3,0,3
     base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
     train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
-                    patch_overlap=0.5, length=-1, num_patches=2000)
+                    patch_overlap=0.5, length=1, num_patches=2000)
     num_classes = args.num_classes if args.num_classes > 0 else None
-    unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
+    unet = UNetModel(image_size, in_channels=in_ch+cond_channels, model_channels=base_dim, out_channels=out_ch, channel_mult=dim_mults, 
                      attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
     model=MNISTDiffusion(unet,
                 timesteps=args.timesteps,
                 image_size=image_size,
-                in_channels=in_channels,
+                in_channels=in_ch,
                 cond_type = args.cond_type,
+                device = device,
                 ).to(device)
+    sampler = DDIMSampler(model)
+
 
     if args.ckpt:
         print("loading checkpoint...")
@@ -87,45 +90,39 @@ def main(args):
     os.makedirs(dir,exist_ok=True), os.makedirs(dir_samples_fid,exist_ok=True), os.makedirs(dir_samples,exist_ok=True)
     offset = len(os.listdir(dir_samples)) if cond is None else len(os.listdir(dir_samples))//3
     print("start inference")
-    ssim, psnr = 0, 0
-    n = 0
+    ssim, psnr, n, cond = 0, 0, 0, None
     for j,(data) in enumerate(test_dataloader):
         print(f"data {j}")
-        image, cond = data["image"], 1-data["segmentation"] if args.cond_type is not None else None  # data[input_key], data[cond_key]
-        if args.random_label: 
-            cond = make_label((image_size, image_size), 10, 10, 40, 40)
-            cond = torch.from_numpy(cond).to(image.dtype)[None,None] # check coherence with NN weights
-        if cond is not None:
-            if cond.mean()>=0.9 or cond.mean()<=0.1: continue # original bounds 0.8 and 0.2. Do it at data level, no continue statement here
+        image, mask = data["image"], 1-data["segmentation"] if args.cond_type is not None else None  # data[input_key], data[cond_key]
+        if args.random_label and args.cond_type=="sum": 
+            mask = make_label((image_size, image_size), 10, 10, 40, 40)
+            mask = torch.from_numpy(cond).to(image.dtype)[None,None].to(device) # check coherence with NN weights
+        if mask is not None:
+            if mask.mean()>=0.9 or mask.mean()<=0.1: continue # original bounds 0.8 and 0.2. Do it at data level, no continue statement here
         
-        if args.cond_type == "sum": 
-            cond=torch.cat([image,cond],1)
-            image = image.to(device)
-            cond = cond.to(device)
-        else:
-            image= image[0].to(device)
-            cond = cond[0].to(device) if cond is not None else None
-            cond = torch.stack([cond for n in range(args.batch_size)]).to(device) if cond is not None else None # maybe better outside sampling
-
-
-        idx = j + offset
+        image = image.to(device) # cond as a vocabulary with mask too? class_label, mask, image, text
         y_test  = torch.full((args.batch_size,),min(j%(num_classes-1),num_classes-1)).to(device) if args.num_classes>0 else None
         catg = classes[y_test[0]] if y_test is not None else "sample"
 
+
+        idx = j + offset
         gt_path, cond_path, img_path = os.path.join(dir_samples, f"sample_{idx}_gt.png"), \
         os.path.join(dir_samples, f"sample_{idx}_cond.png"), \
         os.path.join(dir_samples, f"sample_{idx}.png") # check samples in [-1,1]
 
         model.eval()
-        samples=model.sampling(args.batch_size,clipped_reverse_diffusion=not args.no_clip,device=device, 
-        cond=cond, y=y_test, idx=0)
+        # put mask inside sampler, from outside only a cond input
+        if args.sampler=="ddpm": 
+            samples=model.sampling(args.batch_size,clipped_reverse_diffusion=not args.no_clip,device=device, 
+        cond=cond, y=y_test, idx=0) 
+        else: 
+            samples,_ = sampler.sample(S=250, batch_size=args.batch_size, mask=mask,
+                    shape=(out_ch, image_size, image_size), conditioning=None, verbose=False)
+        
         samples = samples.clip(0,1) if image.min()>=0 else (samples+1.)/2. #samples = (samples+1.)/2. only if train data is in (-1,1)
         #if not args.save: continue # goal: mini script for noise visualization
         
         if cond is not None:
-            if args.cond_type == "sum": 
-                image, mask = cond[:,:3], cond[:,3][:,None]
-                cond = mask*image # gives problems for the subsequent brightness change
             (gt,cond) = (image, cond) if image.min()>=0 else ( (image+1.)/2., (cond+1.)/2. )
             if args.metrics:
                 s, p = structural_similarity_index_measure(samples, gt, data_range=1.0), peak_signal_noise_ratio(samples, gt, data_range=1.0)
