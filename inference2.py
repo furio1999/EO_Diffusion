@@ -24,7 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Training MNISTDiffusion")
     parser.add_argument('--lr',type = float ,default=0.001) # default 0.001
     parser.add_argument('--batch_size',type = int ,default=4)    
-    parser.add_argument('--epochs',type = int,default=100)
+    parser.add_argument('--sampler_steps',type = int ,default=100) 
     parser.add_argument('--outdir',type = str,help = 'directory',default='results/prova')
     parser.add_argument('--ckpt',type = str,help = 'define checkpoint path',default='')
     parser.add_argument('--model_base_dim',type = int,help = 'base dim of Unet',default=64)
@@ -35,13 +35,14 @@ def parse_args():
     parser.add_argument('--no_clip',action='store_true',help = 'set to normal sampling method without clip x_0 which could yield unstable samples')
     parser.add_argument('--cpu',action='store_true',help = 'cpu training')
     parser.add_argument('--metrics',action='store_true',help = 'cpu training')
-    parser.add_argument('--save',action='store_true',help = 'cpu training')
+    parser.add_argument('--save',action='store_true',help = 'cpu training') # no need it, if save_dir is None then do not save
     parser.add_argument('--random_label',action='store_true',help = 'random label')
     parser.add_argument('--wandb',action='store_true',help = 'wandb logger usage')
     parser.add_argument('--num_classes',type = int,help = 'conditional training',default=0)
     parser.add_argument('--cond_type',type = str,help = 'cond type',default=None)
     parser.add_argument('--sampler',type = str,help = 'sampler',default="ddpm")
     parser.add_argument('--samples_fid',action='store_true',help = 'cpu training')
+    parser.add_argument('--n_iter',type = int,help = 'sampler',default=None)
 
     args = parser.parse_args()
     #ckpt_path = os.path.splitext(os.path.split(args.ckpt)[-1])[0]
@@ -51,12 +52,12 @@ def parse_args():
 
 def main(args):
     to_pil = transforms.ToPILImage()
-    device="cpu" if args.cpu else "cuda:1"
+    device="cpu" if args.cpu else "cuda:0"
     torch.cuda.device(device)
     ngpu = torch.cuda.device_count()
     image_size = 64
     in_ch,cond_channels,out_ch=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,4,8],[],1,1
     train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
                     patch_overlap=0.5, length=1, num_patches=2000)
     num_classes = args.num_classes if args.num_classes > 0 else None
@@ -70,6 +71,7 @@ def main(args):
                 device = device,
                 ).to(device)
     sampler = DDIMSampler(model)
+    #plot_params(sampler)
 
 
     if args.ckpt:
@@ -114,9 +116,9 @@ def main(args):
         # put mask inside sampler, from outside only a cond input
         if args.sampler=="ddpm": 
             samples=model.sampling(args.batch_size,clipped_reverse_diffusion=not args.no_clip,device=device, 
-        cond=cond, y=y_test, idx=0) 
+        cond=cond, y=y_test, idx=idx) 
         else: 
-            samples,_ = sampler.sample(S=250, batch_size=args.batch_size, mask=mask,
+            samples,_ = sampler.sample(S=args.sampler_steps, batch_size=args.batch_size, mask=mask,
                     shape=(out_ch, image_size, image_size), conditioning=None, verbose=False)
         
         samples = samples.clip(0,1) if image.min()>=0 else (samples+1.)/2. #samples = (samples+1.)/2. only if train data is in (-1,1)
@@ -132,12 +134,12 @@ def main(args):
             cond = F.adjust_brightness(cond, 3) if cond.mean()<0.2 and args.cond_type!="sum" else cond
             if args.save: save_image(gt, gt_path, nrow=int(math.sqrt(args.batch_size)))
             if args.save: save_image(cond, cond_path, nrow=int(math.sqrt(args.batch_size)))
-        elif args.samples_fid:
+        if args.samples_fid:
             for i in range(samples.shape[0]):
                 samples_path = os.path.join(dir_samples_fid, f"{catg}_{idx}-{i}.png") # check samples in [-1,1]
                 save_image(samples[i],samples_path)
 
-        samples = F.adjust_brightness(samples, 3) if samples.mean()<0.2 else samples
+        samples = F.adjust_brightness(samples, 3) if samples.mean()<0.2 and samples.shape[0]==1 else samples
         save_image(samples,img_path,nrow=int(math.sqrt(args.batch_size))) if args.save else print()
         n = n+1
         
@@ -148,6 +150,9 @@ def main(args):
                 f.write(f"ssim: {ssim_avg}")
                 f.write(f"psnr: {psnr_avg}")
                 f.write(f"length: {n}")
+
+        if args.n_iter is not None:
+            if j > args.n_iter: break
 
             
 

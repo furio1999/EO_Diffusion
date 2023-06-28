@@ -61,21 +61,21 @@ def create_cifar10_dataloaders(batch_size,image_size=32,num_workers=4):
     return DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
             DataLoader(test_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers)
 
-def create_inria_dataloaders(batch_size, size=64, patch_overlap=0.5, num_workers=0, val_split = 0.15, SEED=4097, test=False, device="cpu", length=3, num_patches=200,
+def create_inria_dataloaders(batch_size, image_size=64, patch_overlap=0.5, num_workers=0, val_split = 0.15, SEED=4097, test=False, device="cpu", length=3, num_patches=200,
 return_dataset = False):
         preprocess=transforms.Compose([
                                    transforms.RandomHorizontalFlip(),transforms.RandomVerticalFlip(), #grayscale gives problems
                                    #A.Normalize([0.5],[0.5]),
-                                   ]) if not test or return_dataset else transforms.Compose([transforms.CenterCrop(size=size)])
+                                   ]) if not test or return_dataset else transforms.Compose([transforms.CenterCrop(size=image_size)])
         print("loading dataset...")
-        dataset = InriaDataset(path = "../EO-Diffusion/data/AerialImageDataset", transforms=preprocess, compact=True, size = size,length=length,
+        dataset = InriaDataset(path = "../EO-Diffusion/data/AerialImageDataset", transforms=preprocess, compact=True, size = image_size,length=length,
         ch_last=False,img_ch=3, mask_ch=1, uncond="image", num_patches=num_patches, patch_overlap=patch_overlap, load_from_disk=False, use_int=return_dataset)
 
         train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
         if return_dataset: return train_ds, test_ds
         print("Loaded!!")
         return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
-                DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
+                DataLoader(test_ds,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
 def create_cloud_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=4097, return_dataset=False, test=False, **kwargs):
             preprocess=transforms.Compose([transforms.RandomHorizontalFlip(),transforms.RandomVerticalFlip(),
@@ -85,7 +85,7 @@ def create_cloud_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=409
             train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
             if return_dataset: return train_ds, test_ds
             return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
-                DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
+                DataLoader(test_ds,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
 def create_oscd_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=4097, return_dataset=False, test=False, **kwargs):
             preprocess=transforms.Compose([ transforms.RandomHorizontalFlip(), transforms.RandomHorizontalFlip(), 
@@ -96,20 +96,18 @@ def create_oscd_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=4097
             train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
             if return_dataset: return train_ds, test_ds
             return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
-                DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
+                DataLoader(test_ds,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
 
-def create_test_dataloaders(batch_size, image_size=64, num_workers=0, val_split = 0.15, SEED=4097, num_images=20):
-        preprocess=[
-                                   transforms.RandomHorizontalFlip(),
-                                   transforms.Normalize([0.5],[0.5]),
-                                   ]
-        dataset = TestDataset(num_images=num_images)
-
-        train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
-
-        return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
-                DataLoader(test_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers)
+def create_SARWake_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=4097, return_dataset=False, test=False, **kwargs):
+            preprocess=transforms.Compose([ transforms.RandomHorizontalFlip(), transforms.RandomHorizontalFlip(), 
+                                     transforms.RandomAdjustSharpness(p=0.3, sharpness_factor=0.3),transforms.RandomSolarize(threshold=0.5, p=0.1), 
+                                     transforms.RandomAdjustSharpness(p=0.3, sharpness_factor=1.5),transforms.Normalize(mean=(0.5), std=(0.5))
+                                   ]) if not test else None
+            train_ds, test_ds = SARWakeDataset(transforms=preprocess, **kwargs), SARWakeDataset(mode="val", **kwargs)
+            if return_dataset: return train_ds, test_ds
+            return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
+                DataLoader(test_ds,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
 
 def get_metadata(name):

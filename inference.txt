@@ -1,4 +1,6 @@
 python inference.py --batch_size 1 --ckpt logs\inriafull\steps_00213381.pt --outdir results\cloud_inpaint --cond_type "sum"
+python inference.py --batch_size 1 --ckpt logs\inriafull\steps_00193059.pt --outdir results\cloud_inpaint --cond_type "sum"
+python inference.py --batch_size 1 --ckpt logs\inriafull\steps_00152415.pt --outdir results\cloud_inpaint --cond_type "sum"
 python inference.py --batch_size 1  --ckpt results\inria_attn\best.pt --outdir results\cloud_inria_attn --cond_type "sum" --metrics
 python inference.py --batch_size 1  --ckpt results\clouds\train_attn\best.pt --outdir results\cloud_inpaint_sen --cond_type "sum"
 Inriafull-->{'inception_score_mean': 6.525376649460687, 'inception_score_std': 0.03870544156724096, 'frechet_inception_distance': 199.67656914996158} 80 samples full dataset
@@ -7,4 +9,5 @@ python inference.py --model_base_dim 128 --ckpt results\inria_class_cond\steps_0
 # merge pretrained model in my model
 python inference.py --model_base_dim 128 --ckpt logs\model.ckpt
 python inference.py --batch_size 1  --ckpt logs\oscd\best.pt --outdir results\oscd_cloud_thick --cond_type sum
-python inference2.py --batch_size 1  --ckpt results\inria_attn\best.pt --outdir results\inria_attn_ddim --sampler ddim --save
+python inference.py --batch_size 1  --ckpt results\inria_attn\best.pt --outdir results\inria_attn_ddim --sampler ddim --save
+python inference.py  --ckpt logs\mnist_attn2\best.pt --outdir results\mnist_attn --sampler ddim --save --batch_size 9

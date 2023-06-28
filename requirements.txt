@@ -3,3 +3,4 @@ torchvision
 tqdm
 argparse
 easydict
+timm

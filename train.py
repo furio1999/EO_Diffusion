@@ -46,11 +46,11 @@ def parse_args():
 
 def main(args):
     device="cpu" if args.cpu else "cuda:0"
-    image_size = 64 # 256 - bs 8
+    image_size = 28 # 256 - bs 8
     num_classes = args.num_classes if args.num_classes > 0 else None
-    in_channels,cond_channels,out_channels=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
-    train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4,
+    in_channels,cond_channels,out_channels=1,0,1
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=32,[2,4],[],1,1
+    train_dataloader,test_dataloader=create_mnist_dataloaders(batch_size=args.batch_size, num_workers=4
                     )
     l,bs = len(train_dataloader), min(train_dataloader.batch_size,len(train_dataloader))
 
@@ -78,7 +78,7 @@ def main(args):
     max_steps, posmax, end_lr = len(train_dataloader)*args.epochs, 10*len(train_dataloader), 1e-06
     scheduler = KeyframeLR(optimizer=optimizer, units="steps",
     frames=[
-        {"position": 0, "lr": 1e-05},
+        {"position": 0, "lr": args.lr/100},
         {"transition": "cos"},
         {"position": posmax, "lr": args.lr},
         {"transition": lambda last_lr, sf, ef, pos, *_: args.lr * math.exp(-3*(pos-posmax)/(max_steps-posmax))},

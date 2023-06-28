@@ -167,7 +167,7 @@ def make_patches(imfiles, device="cpu", in_ch=3, outpath=None, num_patches=1, si
   num_patches = min(num_patches, (int(max_size/step))**2)
   im_patches = torch.zeros((num_patches*(length), size, size, in_ch))#.to(device) # originally numpy
   print(f"extracting patches from {in_ch} channels images")
-  vocab = {}
+  vocab, sump = {}, 0
   for i, imfile in enumerate(imfiles):
     print(f"image {i+1}")
     if in_ch == 3:
@@ -182,12 +182,13 @@ def make_patches(imfiles, device="cpu", in_ch=3, outpath=None, num_patches=1, si
     print(f"selected {n_patches} patches out of {image_patches.shape[0]} total patches")
     image_patches = image_patches[:n_patches*jump:jump] if jump>0 else image_patches[:n_patches]
     im_patches[n_patches*i:n_patches*(i+1)]=image_patches
+    sump += n_patches
 
   im_patches = im_patches#.to(device, dtype=torch.uint8) # maybe rearrange dims, careful for next rearrange in preprocess_data
   im_patches = rearrange(im_patches, 'b h w c -> b c h w')
 
   if outpath is None:
-    return im_patches
+    return im_patches[:sump]
 
   os.makedirs(outpath, exist_ok = True)
   textfile = os.path.join(outpath, "images.txt")
@@ -234,9 +235,9 @@ class InriaDataset(Dataset):
         if length > 0 and length < len(images):
           jump = len(images)//length
           images, masks = images[:length*jump:jump], masks[:length*jump:jump]
-        temp = list(zip(images,masks))
-        random.shuffle(temp)
-        images,masks = zip(*temp)
+        #temp = list(zip(images,masks))
+        #random.shuffle(temp)
+        #images,masks = zip(*temp)
         images, masks = list(images), list(masks)
         #print(images,masks)
 
@@ -252,7 +253,8 @@ class InriaDataset(Dataset):
         self.imfiles, self.maskfiles = images, masks
         self.ims, self.masks = self.imfiles, self.maskfiles
         if not load_from_disk:
-          self.ims, self.masks = make_patches(images, in_ch=img_ch, num_patches = self.num_patches, size=self.size, ratio=patch_overlap), make_patches(masks, num_patches=self.num_patches, in_ch=mask_ch, size=self.size, ratio=patch_overlap) #images, masks
+          self.ims = make_patches(images, in_ch=img_ch, num_patches = self.num_patches, size=self.size, ratio=patch_overlap)
+          self.masks = make_patches(masks, num_patches=self.num_patches, in_ch=mask_ch, size=self.size, ratio=patch_overlap) #images, masks
         l = len(self.ims) if type(self.ims) is list else self.ims.shape[0]
         assert l % len(self.imfiles) == 0, print(f"{l} total patches for {len(self.imfiles)} files")
         self.n_patches = l//len(self.imfiles)
@@ -284,8 +286,6 @@ class InriaDataset(Dataset):
         imfile, maskfile = self.ims[n], self.masks[n] #mask gets corrupted during training, but in debuggign is fine!!
         # make size/newsize patches in getitem
         class_label = self.class_labels[self.vocab[os.path.split(self.imfiles[n//self.n_patches])[-1]]] if self.vocab!={} else None # make sure imfiles and patches order correspond
-        #batch = preprocess_data(imfile, maskfile, self.device, mode=self.mode, size=self.size) # image, mask = process() instead of batch=process damn!! for LDM
-        #image,mask = batch["image"], batch["mask"]
         if type(imfile) == str:
           image, mask = self.pil_to_tensor(Image.open(imfile))/255, self.pil_to_tensor(Image.open(maskfile).convert("L"))/255
         else:
@@ -439,7 +439,7 @@ class CloudMaskDataset(Dataset):
       else: self.imgs,self.masks = self.ims[n],self.ms[n]
       #self.imgs = self.imgs.clip(0.,1.)
 
-      idx_i, idx_j=int(npatches/self.np_J)*self.step, (npatches%self.np_J)*self.step
+      idx_i, idx_j=int(npatches/self.np_J)*self.step, int(npatches%self.np_J)*self.step # added int
       #self.step original
       img,mask = self.imgs[:,idx_i:idx_i+self.size, idx_j:idx_j+self.size], self.masks[:,idx_i:idx_i+self.size, idx_j:idx_j+self.size]
       #img = self.eq((img*255).to(torch.uint8))/255
@@ -491,18 +491,59 @@ class OSCD(Dataset):
         img = self.transforms(img)
       batch["image"], batch["segmentation"] = img, label
       return batch
-
-      
-
-class TestDataset(Dataset):
-  def __init__(self, num_images=2000, size=64, img_ch=3, mask_ch=1,uncond="image", cond="class"):
-    self.cond, self.uncond = cond, uncond
-    self.ims, self.masks, self.targets = torch.ones((num_images,img_ch, size,size)),torch.ones((num_images,mask_ch, size,size)), torch.full((num_images,),1)
-
-  def __len__(self):
-    return self.ims.shape[0]
   
-  def __getitem__(self,n):
-    vocab = dict()
-    vocab["image"],vocab["mask"],vocab["class"] = self.ims[n],self.masks[n],self.targets[n]
-    return vocab[self.cond],vocab[self.uncond]
+class SARWakeDataset(Dataset):
+  def __init__(self, root="../data/SARWake", mode="train", size=64, num_patches=200, ratio=0.5, orig = (501,501), length=1, transforms=None):
+    self.root = root + "/train2017" if mode == "train" else root + "/val2017"
+    self.db = pd.read_csv(self.root + "/train_csv.csv") if mode == "train" else pd.read_csv(self.root + "/val_csv.csv")
+    self.names = self.db["filename"][:length]
+    self.size = size
+    self.orig_size, self.step = orig, int((1-ratio)*size)
+    self.np_I, self.np_J = int((self.orig_size[0]-self.size)/self.step+1)+1*int(self.orig_size[0]>self.size), int((self.orig_size[1]-self.size)/self.step+1)+1*int(self.orig_size[1]>self.size) # may be the opposite
+    self.np_I, self.np_J = max(self.np_I,1), max(self.np_J,1)
+    self.num_patches, self.size = min(num_patches, (self.np_J*self.np_I)), size # np_I*np_J
+    self.transforms = transforms
+    self.to_tensor = torchvision.transforms.ToTensor()
+    self.orig_sizes, self.tot_patches, self.single_patches, patch_to_tile = self.make_patches(self.size, self.num_patches)
+    self.sump = sum(self.single_patches)
+  
+  def __len__(self):
+     return self.tot_patches[-1]
+  
+  def __getitem__(self,i):
+    # retrieve n from i
+    num_patches = min(self.tot_patches[self.tot_patches>i])
+    n = int(i/num_patches)
+    patch_idx = i%self.single_patches[n]
+    tile = self.to_tensor(Image.open(os.path.join(self.root, self.names[n])))[0][None] # be careful to grayscale opening
+    orig_size = tile.shape[1:]
+    np_I, np_J = int((orig_size[0]-self.size)/self.step+1)+1*int(orig_size[0]>self.size), int((orig_size[1]-self.size)/self.step+1)+1*int(orig_size[1]>self.size)
+    np_I, np_J = max(np_I,1), max(np_J,1)
+    idx_i, idx_j=int(patch_idx/np_J)*self.step, int(patch_idx%np_J)*self.step
+    idx_i, idx_j = max(min(idx_i, orig_size[0]-self.size-1),0), max(min(idx_j, orig_size[1]-self.size-1),0)
+    print(idx_i, idx_j)
+    img = tile[:,idx_i:idx_i+self.size, idx_j:idx_j+self.size]
+
+    if self.transforms is not None:
+      out = self.transforms(img)
+      img = out
+    if len(img.shape)==2: img = img[None]
+    
+    #img,mask = img*2.-1., mask*2.-1.
+    batch = {}
+    batch["image"]=img
+    return batch
+
+  def make_patches(self,size,n_patches, ratio=0.5):
+    sizes, num_patches, single_patches, patch_to_tile = [], [], [], {}
+    for name in self.names:
+      tile = Image.open(os.path.join(self.root, name))
+      orig_size = tile.size
+      np_I, np_J = int((orig_size[0]-self.size)/self.step+1)+1*int(orig_size[0]>self.size), int((orig_size[1]-self.size)/self.step+1)+1*int(orig_size[1]>self.size)
+      np_I, np_J = max(np_I,1), max(np_J,1)
+      n_patches = min(n_patches, (np_J*np_I)) # 3 corner patches
+      sizes.append(orig_size), num_patches.append(n_patches+num_patches[-1]) if len(num_patches)>0 else num_patches.append(n_patches), single_patches.append(n_patches) # better if included in csv file
+      patch_to_tile[n_patches]=name
+    return np.array(sizes), np.array(num_patches), single_patches, patch_to_tile
+
+    

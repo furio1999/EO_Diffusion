@@ -6,19 +6,27 @@ from backbones.unet_openai import *
 from tqdm import tqdm
 from torchvision.utils import save_image
 import torchvision.transforms.functional as F
+import pytorch_lightning as pl
+from utils import ExponentialMovingAverage
+from train_utils import KeyframeLR
 #def __init__(self,image_size,in_channels,out_channels,cond_channels=0, time_embedding_dim=256,timesteps=1000,
 #    cond_type = None, base_dim=32, dim_mults= [2,4], attention_resolutions = tuple([]), num_classes=None):
 
-class MNISTDiffusion(nn.Module):
+class EO_Diffusion(pl.LightningModule):
     def __init__(self, model, image_size,in_channels, time_embedding_dim=256,timesteps=1000,
-    cond_type = None, device = "cpu"):
+    cond_type = None, cond_stage_key = None, device = "cpu", lr=1e-03, model_ema=True, epochs = 100, steps_epochs = 100):
         super().__init__()
         print("loading model...")
         self.timesteps=timesteps
         self.in_channels=in_channels
         self.image_size=image_size
-        self.cond_type = cond_type
+        self.cond_type, self.cond_key = cond_type, cond_stage_key
         self.device = device
+        self.lr = lr
+        self.model_ema = model_ema
+
+        self.epochs, self.steps_epochs = epochs, steps_epochs
+        self.loss_fn=nn.MSELoss(reduction='mean')
 
         betas=self._cosine_variance_schedule(timesteps)
 
@@ -32,10 +40,39 @@ class MNISTDiffusion(nn.Module):
         self.register_buffer("sqrt_one_minus_alphas_cumprod",torch.sqrt(1.-alphas_cumprod))
 
         #self.model=Unet(timesteps,time_embedding_dim,in_channels,in_channels,base_dim,dim_mults) # why out_channels=2??
-        self.model = model
+        self.model = DiffusionWrapper(model, conditioning_key=cond_type)
         print("Loaded!!")
 
-    def forward(self,x,noise, cond=None, y=None):
+    def training_step(self, batch, batch_idx):
+        x, x_c = batch[self.first_stage_key], batch[self.cond_stage_key]
+        noise=torch.randn_like(x).to(self.device)
+        x=x.to(self.device)
+        pred=self.model(x,noise, cond=x_c)
+        loss=self.loss_fn(pred,noise)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer=torch.optim.AdamW(self.parameters(), lr=self.lr)
+        max_steps, posmax, end_lr = self.steps_epochs*self.epochs, 10*self.steps_epochs, 1e-06
+        scheduler = KeyframeLR(optimizer=optimizer, units="steps",
+        frames=[
+            {"position": 0, "lr": self.lr/100},
+            {"transition": "cos"},
+            {"position": posmax, "lr": self.lr},
+            {"transition": lambda last_lr, sf, ef, pos, *_: self.lr * math.exp(-3*(pos-posmax)/(max_steps-posmax))},
+        ],
+        end=max_steps,
+    )
+        return ({"optimizer":optimizer, "lr_scheduler":scheduler})
+    
+    def ema_module(self, epochs, batch_size, model_ema_steps, model_ema_decay, device):
+        adjust = 1* batch_size * model_ema_steps / epochs
+        alpha = 1.0 - model_ema_decay
+        alpha = min(1.0, alpha * adjust)
+        model_ema = ExponentialMovingAverage(self, device=device, decay=1.0 - alpha)
+        return model_ema
+
+    def forward(self,x,noise, cond=None, y=None, context=None):
         # x:NCHW
         t=torch.randint(0,self.timesteps,(x.shape[0],)).to(x.device)
         x_t=self._forward_diffusion(x,t,noise)
@@ -149,3 +186,30 @@ class MNISTDiffusion(nn.Module):
 
         return mean+std*noise 
     
+class DiffusionWrapper(pl.LightningModule):
+    def __init__(self, nn_model, conditioning_key):
+        super().__init__()
+        self.diffusion_model = nn_model
+        self.conditioning_key = conditioning_key
+        assert self.conditioning_key in [None, 'concat', 'crossattn', 'hybrid', 'adm']
+
+    def forward(self, x, t, c_concat: list = None, c_crossattn: list = None):
+        if self.conditioning_key is None:
+            out = self.diffusion_model(x, t)
+        elif self.conditioning_key == 'concat':
+            xc = torch.cat([x] + c_concat, dim=1)
+            out = self.diffusion_model(xc, t)
+        elif self.conditioning_key == 'crossattn':
+            cc = torch.cat(c_crossattn, 1)
+            out = self.diffusion_model(x, t, context=cc)
+        elif self.conditioning_key == 'hybrid':
+            xc = torch.cat([x] + c_concat, dim=1)
+            cc = torch.cat(c_crossattn, 1)
+            out = self.diffusion_model(xc, t, context=cc)
+        elif self.conditioning_key == 'class':
+            cc = c_crossattn[0]
+            out = self.diffusion_model(x, t, y=cc)
+        else:
+            raise NotImplementedError()
+
+        return out

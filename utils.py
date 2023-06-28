@@ -36,6 +36,21 @@ def make_label(shape, mnw, mnh, mxw, mxh):
 
     return label
 
+def plot_params(sampler, steps=100):
+    sampler.make_schedule(steps)
+    plt.plot(sampler.model.betas.cpu())
+    plt.show()
+    ddim_alphas = np.zeros(sampler.model.timesteps)
+    ddim_alphas[sampler.ddim_timesteps] = sampler.ddim_alphas.cpu()
+    ddim_alphas[ddim_alphas == 0] = float("nan")
+    breakpoint()
+    plt.plot(ddim_alphas)
+    plt.plot(sampler.alphas_cumprod.cpu())
+    plt.show()
+    diff = sampler.alphas_cumprod.cpu()[sampler.ddim_timesteps] - ddim_alphas[sampler.ddim_timesteps]
+    plt.plot(diff)
+    plt.show()
+
 #torchvision ema implementation
 #https://github.com/pytorch/vision/blob/main/references/classification/utils.py#L159
 class ExponentialMovingAverage(torch.optim.swa_utils.AveragedModel):
