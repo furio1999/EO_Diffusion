@@ -9,7 +9,7 @@ import torchvision.transforms.functional as F
 #def __init__(self,image_size,in_channels,out_channels,cond_channels=0, time_embedding_dim=256,timesteps=1000,
 #    cond_type = None, base_dim=32, dim_mults= [2,4], attention_resolutions = tuple([]), num_classes=None):
 
-class MNISTDiffusion(nn.Module):
+class EODiffusion(nn.Module):
     def __init__(self, model, image_size,in_channels, time_embedding_dim=256,timesteps=1000,
     cond_type = None, device = "cpu"):
         super().__init__()

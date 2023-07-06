@@ -9,7 +9,7 @@ from torchmetrics.functional import peak_signal_noise_ratio
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
-from diffusion.model import MNISTDiffusion
+from diffusion.model import EODiffusion
 from utils import *
 import os
 import math
@@ -24,7 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Training MNISTDiffusion")
     parser.add_argument('--lr',type = float ,default=0.001) # default 0.001
     parser.add_argument('--batch_size',type = int ,default=4)    
-    parser.add_argument('--sampler_steps',type = int ,default=100) 
+    parser.add_argument('--sampler_steps',type = int ,default=250) 
     parser.add_argument('--outdir',type = str,help = 'directory',default='results/prova')
     parser.add_argument('--ckpt',type = str,help = 'define checkpoint path',default='')
     parser.add_argument('--model_base_dim',type = int,help = 'base dim of Unet',default=64)
@@ -57,13 +57,12 @@ def main(args):
     ngpu = torch.cuda.device_count()
     image_size = 64
     in_ch,cond_channels,out_ch=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,4,8],[],1,1
-    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
-                    patch_overlap=0.5, length=1, num_patches=2000)
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
+    train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4, test=True)
     num_classes = args.num_classes if args.num_classes > 0 else None
     unet = UNetModel(image_size, in_channels=in_ch+cond_channels, model_channels=base_dim, out_channels=out_ch, channel_mult=dim_mults, 
                      attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
-    model=MNISTDiffusion(unet,
+    model=EODiffusion(unet,
                 timesteps=args.timesteps,
                 image_size=image_size,
                 in_channels=in_ch,
@@ -153,6 +152,12 @@ def main(args):
 
         if args.n_iter is not None:
             if j > args.n_iter: break
+
+def test():
+    dataset = OSCD()
+    print(len(dataset))
+    breakpoint()
+    
 
             
 

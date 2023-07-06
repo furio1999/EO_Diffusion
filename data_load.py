@@ -467,8 +467,9 @@ class CloudMaskDataset(Dataset):
       return ims, ms
    
 class OSCD(Dataset):
-  def __init__(self,pw=64,ph=64,sw=32,sh=32,mnh=10,mnw=10,mxw=50,mxh=50, clip=0.3, transform=None, length=None):
+  def __init__(self,pw=64,ph=64,sw=32,sh=32,mnh=10,mnw=10,mxw=50,mxh=50, clip=0.3, mult=1, transform=None, length=None):
     self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip)
+    if mult > 1: self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip, mult)
     self.img_names = glob.glob(os.path.join(self.path,"*rgb*"))
     self.label_names = glob.glob(os.path.join(self.path, '*lbl*'))
     self.to_tensor = torchvision.transforms.ToTensor()
@@ -545,5 +546,36 @@ class SARWakeDataset(Dataset):
       sizes.append(orig_size), num_patches.append(n_patches+num_patches[-1]) if len(num_patches)>0 else num_patches.append(n_patches), single_patches.append(n_patches) # better if included in csv file
       patch_to_tile[n_patches]=name
     return np.array(sizes), np.array(num_patches), single_patches, patch_to_tile
+  
+class EuroSAT(Dataset):
+   def __init__(self, transforms = None, root = "../data/EuroSAT_RGB", size=64, ratio=0.5, length=None):
+      self.folders = os.listdir(root)
+      self.files = []
+      for folder in self.folders:
+         print(folder)
+         files = glob.glob(os.path.join(root, folder,"*.jpg"))
+         print(files[0])
+         for file in files: 
+            self.files.append(file)
+      self.length = len(self.files) # hw is it handled by random split?
+      self.to_tensor = torchvision.transforms.ToTensor()
+      self.transforms = transforms
+
+   def __len__(self):
+    return self.length
+   
+   def __getitem__(self, n):
+      img = Image.open(self.files[n])
+      batch = {}
+      img = self.to_tensor(img)
+
+      if self.transforms is not None:
+        out = self.transforms(img)
+        img = out
+      if len(img.shape)==2: img = img[None]
+
+      batch["image"] = img
+
+      return batch
 
     

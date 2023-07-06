@@ -40,3 +40,9 @@ oscd
     base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
     train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4,
                     )
+eurosat
+    in_channels,cond_channels,out_channels=3,0,3
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
+    train_dataloader,test_dataloader=create_Eurosat_dataloaders(batch_size=args.batch_size, num_workers=4
+                    )
+    lr = 10e-04, keyframelr, posmax lr/100

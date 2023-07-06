@@ -1,13 +1,11 @@
 import torch
 import torch.nn as nn
-from torchvision.datasets import MNIST
-from torchvision import transforms 
 from torchvision.utils import save_image
 import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import *
-from diffusion.model import MNISTDiffusion
+from diffusion.model import EODiffusion
 from backbones.unet_openai import UNetModel
 from utils import ExponentialMovingAverage
 import os
@@ -46,17 +44,17 @@ def parse_args():
 
 def main(args):
     device="cpu" if args.cpu else "cuda:0"
-    image_size = 28 # 256 - bs 8
+    image_size = 64 # 256 - bs 8
     num_classes = args.num_classes if args.num_classes > 0 else None
-    in_channels,cond_channels,out_channels=1,0,1
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=32,[2,4],[],1,1
-    train_dataloader,test_dataloader=create_mnist_dataloaders(batch_size=args.batch_size, num_workers=4
+    in_channels,cond_channels,out_channels=3,0,3
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
+    train_dataloader,test_dataloader=create_Eurosat_dataloaders(batch_size=args.batch_size, num_workers=4
                     )
     l,bs = len(train_dataloader), min(train_dataloader.batch_size,len(train_dataloader))
 
     unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
                      attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
-    model=MNISTDiffusion(unet,
+    model=EODiffusion(unet,
                 timesteps=args.timesteps,
                 image_size=image_size,
                 in_channels=in_channels

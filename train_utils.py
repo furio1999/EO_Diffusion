@@ -4,7 +4,8 @@ from typing import Sequence, Mapping, Literal, Callable
 
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from pytorch_lightning import Callback, ModelCheckpoint
+from pytorch_lightning import Callback
+from pytorch_lightning.callbacks import ModelCheckpoint
 from utils import ExponentialMovingAverage
 
 from timm.utils.model import get_state_dict, unwrap_model

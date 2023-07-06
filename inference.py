@@ -9,7 +9,7 @@ from torchmetrics.functional import peak_signal_noise_ratio
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
-from diffusion.model import MNISTDiffusion
+from diffusion.model import EODiffusion
 from utils import *
 import os
 import math
@@ -55,15 +55,15 @@ def main(args):
     device="cpu" if args.cpu else "cuda:1"
     torch.cuda.device(device)
     ngpu = torch.cuda.device_count()
-    image_size = 28
-    in_ch,cond_channels,out_ch=1,0,1
+    image_size = 64
+    in_ch,cond_channels,out_ch=3,0,3
     base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
-    train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4, image_size=image_size,
+    train_dataloader,test_dataloader=create_Eurosat_dataloaders(batch_size=args.batch_size, num_workers=4,test=True
                     )
     num_classes = args.num_classes if args.num_classes > 0 else None
     unet = UNetModel(image_size, in_channels=in_ch+cond_channels, model_channels=base_dim, out_channels=out_ch, channel_mult=dim_mults, 
                      attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
-    model=MNISTDiffusion(unet,
+    model=EODiffusion(unet,
                 timesteps=args.timesteps,
                 image_size=image_size,
                 in_channels=in_ch,
@@ -94,17 +94,19 @@ def main(args):
     os.makedirs(dir,exist_ok=True), os.makedirs(dir_samples_fid,exist_ok=True), os.makedirs(dir_samples,exist_ok=True)
     offset = len(os.listdir(dir_samples)) if cond is None else len(os.listdir(dir_samples))//3
     print("start inference")
-    ssim, psnr, n, cond = 0, 0, 0, None
-    for j,(data) in enumerate(test_dataloader):
+    ssim, psnr, n  = 0, 0, 0
+    for j,(data) in enumerate(train_dataloader):
         print(f"data {j}")
-        image, mask = data["image"], 1-data["segmentation"] if args.cond_type is not None else None  # data[input_key], data[cond_key]
+        image, mask = data["image"], data["segmentation"] if args.cond_type is not None else None  # data[input_key], data[cond_key]
+        if args.cond_type == "sum": mask = 1-mask # do it inside dataloader?
         if args.random_label and args.cond_type=="sum": 
             mask = make_label((image_size, image_size), 10, 10, 40, 40)
-            mask = torch.from_numpy(cond).to(image.dtype)[None,None].to(device) # check coherence with NN weights
         if mask is not None:
-            if mask.mean()>=0.9 or mask.mean()<=0.1: continue # original bounds 0.8 and 0.2. Do it at data level, no continue statement here
+            if mask.mean()>=0.9 or mask.mean()<=0.1: pass # original bounds 0.8 and 0.2. Do it at data level, no continue statement here
+        cond = mask.to(device)
         
         image = image.to(device) # cond as a vocabulary with mask too? class_label, mask, image, text
+        if args.cond_type == "sum": cond = torch.cat((image,cond),dim=1)
         y_test  = torch.full((args.batch_size,),min(j%(num_classes-1),num_classes-1)).to(device) if args.num_classes>0 else None
         catg = classes[y_test[0]] if y_test is not None else "sample"
 
@@ -128,6 +130,7 @@ def main(args):
         #if not args.save: continue # goal: mini script for noise visualization
         
         if cond is not None:
+            if cond.shape[1] == 4: cond = cond[:args.batch_size,3][:,None]
             (gt,cond) = (image, cond) if image.min()>=0 else ( (image+1.)/2., (cond+1.)/2. )
             if args.metrics:
                 s, p = structural_similarity_index_measure(samples, gt, data_range=1.0), peak_signal_noise_ratio(samples, gt, data_range=1.0)
@@ -166,6 +169,9 @@ def test():
         show(image)
         if i%dataset.n_patches == 0: Image.open(name).show()
         print(name)
+
+def test_model(model):
+    pass
 
 def test2(image_size):
     dl = create_inria_dataloaders(batch_size = 1, size=64, patch_overlap=0 ,return_dataset=True, test=True)
