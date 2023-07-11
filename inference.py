@@ -58,7 +58,7 @@ def main(args):
     image_size = 64
     in_ch,cond_channels,out_ch=3,0,3
     base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
-    train_dataloader,test_dataloader=create_Eurosat_dataloaders(batch_size=args.batch_size, num_workers=4,test=True
+    train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4,test=True,
                     )
     num_classes = args.num_classes if args.num_classes > 0 else None
     unet = UNetModel(image_size, in_channels=in_ch+cond_channels, model_channels=base_dim, out_channels=out_ch, channel_mult=dim_mults, 
@@ -95,7 +95,7 @@ def main(args):
     offset = len(os.listdir(dir_samples)) if cond is None else len(os.listdir(dir_samples))//3
     print("start inference")
     ssim, psnr, n  = 0, 0, 0
-    for j,(data) in enumerate(train_dataloader):
+    for j,(data) in enumerate(test_dataloader):
         print(f"data {j}")
         image, mask = data["image"], data["segmentation"] if args.cond_type is not None else None  # data[input_key], data[cond_key]
         if args.cond_type == "sum": mask = 1-mask # do it inside dataloader?
@@ -130,7 +130,7 @@ def main(args):
         #if not args.save: continue # goal: mini script for noise visualization
         
         if cond is not None:
-            if cond.shape[1] == 4: cond = cond[:args.batch_size,3][:,None]
+            if mask is not None: cond = image*((mask+0.7).clip(0,1))
             (gt,cond) = (image, cond) if image.min()>=0 else ( (image+1.)/2., (cond+1.)/2. )
             if args.metrics:
                 s, p = structural_similarity_index_measure(samples, gt, data_range=1.0), peak_signal_noise_ratio(samples, gt, data_range=1.0)
@@ -160,18 +160,17 @@ def main(args):
         if args.n_iter is not None:
             if j > args.n_iter: break
 
-def test():
-    dataset = InriaDataset(path = "../EO-Diffusion/data/AerialImageDataset", length=2, num_patches=2000, size=3000, ch_last=False)
-    for i, data in enumerate(dataset):
-        image = data["image"]
-        breakpoint()
-        name = dataset.imfiles[i//dataset.n_patches]
-        show(image)
-        if i%dataset.n_patches == 0: Image.open(name).show()
-        print(name)
+def test(idx=0):
+    to_pil = torchvision.transforms.ToPILImage()
+    dl, dl2 = create_oscd_dataloaders(batch_size=1, return_dataset=True, test=True)
+    print(len(dl), len(dl2))
+    img, img2, lbl = dl[idx]["image"],dl2[idx]["image"], 1-dl[idx]["segmentation"]
+    image = img*((lbl+0.7).clip(0,1))
+    image = to_pil(image)
+    image.show()
+    breakpoint()
 
-def test_model(model):
-    pass
+
 
 def test2(image_size):
     dl = create_inria_dataloaders(batch_size = 1, size=64, patch_overlap=0 ,return_dataset=True, test=True)
@@ -190,4 +189,4 @@ def test2(image_size):
 
 if __name__=="__main__":
     args=parse_args()
-    main(args)
+    test(idx=3)

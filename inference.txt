@@ -9,6 +9,7 @@ python inference.py --model_base_dim 128 --ckpt results\inria_class_cond\steps_0
 # merge pretrained model in my model
 python inference.py --model_base_dim 128 --ckpt logs\model.ckpt
 python inference.py --batch_size 1  --ckpt logs\oscd\best.pt --outdir results\oscd_cloud_thick --cond_type sum
+python inference.py --batch_size 1  --ckpt logs\oscd\best.pt --outdir data\oscd_real\train --cond_type sum --save
 python inference.py --batch_size 1  --ckpt results\inria_attn\best.pt --outdir results\inria_attn_ddim --sampler ddim --save
 python inference.py  --ckpt logs\mnist_attn2\best.pt --outdir results\mnist_attn --sampler ddim --save --batch_size 9
 python inference2.py --ckpt logs\Eurosat\best.pt --outdir results\Eurosat 

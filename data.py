@@ -92,8 +92,10 @@ def create_oscd_dataloaders(batch_size, num_workers=0, val_split=0.15, SEED=4097
                                      transforms.RandomAdjustSharpness(p=0.3, sharpness_factor=0.3),transforms.RandomSolarize(threshold=0.5, p=0.1), 
                                      transforms.RandomAdjustSharpness(p=0.3, sharpness_factor=1.5),transforms.Normalize(mean=(0.5), std=(0.5))
                                    ]) if not test else None
-            dataset = OSCD(transform=preprocess,**kwargs)
-            train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
+            if "fake" in kwargs.keys() and kwargs["fake"]:     
+                dataset = OSCD(transform=preprocess,**kwargs) # access kwargs field python, kwargs.fake
+                train_ds, test_ds = random_split(dataset, [1-val_split, val_split], generator=Generator().manual_seed(SEED))
+            else: train_ds, test_ds = OSCD(transform=preprocess, train=True, **kwargs), OSCD(transform=preprocess, train=False, **kwargs)
             if return_dataset: return train_ds, test_ds
             return DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=num_workers),\
                 DataLoader(test_ds,batch_size=batch_size,shuffle=False,num_workers=num_workers)

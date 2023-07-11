@@ -467,11 +467,17 @@ class CloudMaskDataset(Dataset):
       return ims, ms
    
 class OSCD(Dataset):
-  def __init__(self,pw=64,ph=64,sw=32,sh=32,mnh=10,mnw=10,mxw=50,mxh=50, clip=0.3, mult=1, transform=None, length=None):
-    self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip)
-    if mult > 1: self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip, mult)
-    self.img_names = glob.glob(os.path.join(self.path,"*rgb*"))
-    self.label_names = glob.glob(os.path.join(self.path, '*lbl*'))
+  def __init__(self,pw=64,ph=64,sw=32,sh=32,mnh=10,mnw=10,mxw=50,mxh=50, clip=0.3, mult=1, transform=None, length=None, fake=False, train=True):
+    self.fake = fake
+    if fake: self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip)
+    if fake and mult > 1: self.path='../data/OSCD_p_dataset_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(pw,ph,sw,sh,mnw, mnh, mxw, mxh,clip, mult)
+    if not fake:
+       if train: self.path = "../data/OSCD_{}_{}/train".format(pw,sw)
+       else: self.path = "../data/OSCD_{}_{}/test".format(pw,sw)
+    #self.traindirs = os.open("train.text")
+    self.img_names = sorted(glob.glob(os.path.join(self.path,"*imgs_2_rect-rgb*")))
+    self.gt_names = sorted(glob.glob(os.path.join(self.path,"*imgs_1_rect-rgb*")))
+    self.label_names = sorted(glob.glob(os.path.join(self.path, '*lbl*')))
     self.to_tensor = torchvision.transforms.ToTensor()
     self.transforms, self.normalize = transform, torchvision.transforms.Normalize(mean=(0.5), std=(0.5))
     if length is not None:
