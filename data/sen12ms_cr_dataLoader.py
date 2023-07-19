@@ -80,6 +80,8 @@ class SEN12MSCRDataset:
     def get_scene_ids(self, season):
         season = Seasons(season).value
         path = os.path.join(self.base_dir, season)
+        paths = [p for p in os.listdir(self.base_dir) if os.path.isdir(os.path.join(self.base_dir, p))]
+        self.paths = paths
         # put s2, s2_cloudy in season or change the script
 
         """
@@ -90,10 +92,11 @@ class SEN12MSCRDataset:
                 season, self.base_dir))"""
 
         # add all dirs except "s2_cloudy" (which messes with subsequent string splits)
-        scene_list = [os.path.basename(s)
-                      for s in glob(os.path.join(path, "*")) if "s2_cloudy" not in s]
-        scene_list = [int(s.split("_")[1]) for s in scene_list]
-        breakpoint()
+        #scene_list = [os.path.basename(s)
+        #              for s in glob(os.path.join(path, "*")) if "s2_cloudy" not in s]
+        scene_list = [os.path.join(self.base_dir, s) for s in paths if "s2_cloudy" not in s and ("s1" in s or "s2" in s)]
+        scene_list = [int(s_id.split("_")[1]) for s in scene_list for s_id in os.listdir(s)]
+        #scene_list = [int(s.split("_")[1]) for s in scene_list]
         return set(scene_list)
 
     """
@@ -102,7 +105,7 @@ class SEN12MSCRDataset:
 
     def get_patch_ids(self, season, scene_id):
         season = Seasons(season).value
-        path = os.path.join(self.base_dir, season, f"s1_{scene_id}")
+        path = os.path.join(self.base_dir, season, f"s2_{scene_id}") # expect ROI_SEASON\s2_scene_id. Do move operations. From cvommand line or manually.
         """
         if not os.path.exists(path):
             raise NameError(
@@ -111,6 +114,7 @@ class SEN12MSCRDataset:
         patch_ids = [os.path.splitext(os.path.basename(p))[0]
                      for p in glob(os.path.join(path, "*"))]
         patch_ids = [int(p.rsplit("_", 1)[1].split("p")[1]) for p in patch_ids]
+        breakpoint()
 
         return patch_ids
 
@@ -228,6 +232,9 @@ class SEN12MSCRDataset:
 
         return np.stack(s1_data, axis=0), np.stack(s2_data, axis=0), np.stack(s2cloudy_data, axis=0), bounds
 
+def test():
+    path = "H:\Fulvio\data\SEN12MS_CR"
+    breakpoint()
 
 if __name__ == "__main__":
     import time
@@ -242,6 +249,7 @@ if __name__ == "__main__":
     start = time.time()
     # Load the RGB bands of the first S2 patch in scene 8
     SCENE_ID = 8
+    breakpoint()
     s2_rgb_patch, bounds = sen12mscr.get_patch(Seasons.SPRING, SCENE_ID, 
                                             spring_ids[SCENE_ID][0], bands=S2Bands.RGB)
     print("Time Taken {}s".format(time.time() - start))

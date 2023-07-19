@@ -57,8 +57,8 @@ def main(args):
     ngpu = torch.cuda.device_count()
     image_size = 64
     in_ch,cond_channels,out_ch=3,0,3
-    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[],1,1
-    train_dataloader,test_dataloader=create_oscd_dataloaders(batch_size=args.batch_size, num_workers=4,test=True,
+    base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,4,8],[],1,1
+    train_dataloader,test_dataloader=create_inria_dataloaders(batch_size=args.batch_size, num_workers=4,test=True,
                     )
     num_classes = args.num_classes if args.num_classes > 0 else None
     unet = UNetModel(image_size, in_channels=in_ch+cond_channels, model_channels=base_dim, out_channels=out_ch, channel_mult=dim_mults, 
@@ -103,7 +103,7 @@ def main(args):
             mask = make_label((image_size, image_size), 10, 10, 40, 40)
         if mask is not None:
             if mask.mean()>=0.9 or mask.mean()<=0.1: pass # original bounds 0.8 and 0.2. Do it at data level, no continue statement here
-        cond = mask.to(device)
+        if args.cond_type is not None: cond = mask.to(device)
         
         image = image.to(device) # cond as a vocabulary with mask too? class_label, mask, image, text
         if args.cond_type == "sum": cond = torch.cat((image,cond),dim=1)
@@ -120,13 +120,14 @@ def main(args):
         # put mask inside sampler, from outside only a cond input
         if args.sampler=="ddpm": 
             samples=model.sampling(args.batch_size,clipped_reverse_diffusion=not args.no_clip,device=device, 
-        cond=cond, y=y_test, idx=idx) 
+        cond=cond, y=y_test, idx=0, save=True) 
         else: 
             samples,_ = sampler.sample(S=args.sampler_steps, batch_size=args.batch_size, mask=mask,
                     shape=(out_ch, image_size, image_size), conditioning=None, verbose=False)
         
         samples = samples.clip(0,1) if image.min()>=0 else (samples+1.)/2. #samples = (samples+1.)/2. only if train data is in (-1,1)
         print(image.min())
+        breakpoint()
         #if not args.save: continue # goal: mini script for noise visualization
         
         if cond is not None:
@@ -189,4 +190,4 @@ def test2(image_size):
 
 if __name__=="__main__":
     args=parse_args()
-    test(idx=3)
+    main(args)
