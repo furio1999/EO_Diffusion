@@ -3,4 +3,4 @@ results
 logs
 wandb
 inference2.py
-data
+data/*/
