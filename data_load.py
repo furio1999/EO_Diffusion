@@ -20,6 +20,7 @@ from kornia.utils import image_to_tensor
 import kornia.augmentation as KA
 import pdb, random
 import pandas as pd
+from data.sen12ms_cr_dataLoader import *
 
 # inria: 2 classes? multiclasses in an image?
 
@@ -581,6 +582,16 @@ class EuroSAT(Dataset):
       if len(img.shape)==2: img = img[None]
 
       batch["image"] = img
+
+      return batch
+   
+class Sen12MSCR(Dataset):
+   def __init__(self, root = "H:\Fulvio\data\SEN12MS_CR"):
+      pass
+   def __len__(self):
+      pass
+   def __getitem__(self,n):
+      batch = {}
 
       return batch
 
