@@ -430,7 +430,7 @@ class CloudMaskDataset(Dataset):
    def __len__(self):
       return self.length
    def __getitem__(self,i):
-      n, npatches = int(i/self.num_patches), i%self.num_patches
+      n, npatches = int(i/self.num_patches), i%self.num_patches # i//...
       if self.load_from_disk:
         self.imgs, self.masks = np.load(os.path.join(self.img_path, self.names[self.index[n]]+".npy")),\
         np.load(os.path.join(self.mask_path, self.names[self.index[n]]+".npy"))

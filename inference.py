@@ -20,7 +20,7 @@ from PIL import Image
 from backbones.unet_openai import UNetModel
 from diffusion.ddim import DDIMSampler
 
-def parse_args():
+def parse_args(def_arg=False):
     parser = argparse.ArgumentParser(description="Training MNISTDiffusion")
     parser.add_argument('--lr',type = float ,default=0.001) # default 0.001
     parser.add_argument('--batch_size',type = int ,default=4)    
@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--samples_fid',action='store_true',help = 'cpu training')
     parser.add_argument('--n_iter',type = int,help = 'sampler',default=None)
 
-    args = parser.parse_args()
+    args = parser.parse_args() if not def_arg else parser.parse_args("")
     #ckpt_path = os.path.splitext(os.path.split(args.ckpt)[-1])[0]
     # n_samples substitute with batch_size, or delete n_iter
 
