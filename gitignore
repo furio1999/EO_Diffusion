@@ -1,0 +1,7 @@
+.vscode
+cifar_data/
+mnist_data/
+wandb/
+results/*.png
+results/*/*.png
+train_naive.py
