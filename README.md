@@ -18,10 +18,10 @@ You can find a demo at the following notebook [EO_Diffusion.ipynb](EO_Diffusion.
 ## Installation
 Conda environment: 
 - Conda 23.1.0
-- NVIDIA rtx 4000 (49 GB)
 - CUDA toolkit: 11.7.1
 - Pytorch: 11.3.0
 - Torchvision + torchaudio: 0.14.0 + 0.13.0
+- Tested on an NVIDIA RTX 4000 (49 GB)
 GPU utilities installation:
 I don't recomment using the exported eo_diffusion.yml file. It's better to install it directly from pytorch website with the required versions, as shown in the command below:
 
