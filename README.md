@@ -1,8 +1,8 @@
 # EO-Diffusion
 <p align="center">
   <img   
-  width="100%"
-  height="100%" 
+  width="30%"
+  height="30%" 
   src="assets/diff1.gif">
 </p>
 ![60 epochs training from scratch](assets/diff1.gif "60 epochs training from scratch")
