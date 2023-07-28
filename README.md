@@ -3,6 +3,16 @@
 
 A simple codebase for my master thesis work about diffusion models for EO
 
+## Demo
+You can find a demo at the following notebook EO_Diffusion.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/weiji14/deepbedmap/]
+
+## Use-Cases
+### Cloud Removal
+
+### Synthetic OSCD
+
+### Urban Replanning
+
 ## Installation
 Conda environment: 
 - Conda 23.1.0
@@ -48,6 +58,16 @@ python train.py --dir path/to/your/dir --ckpt ckpt_name
 ```bash
 python inference.py --ckpt path/to/your/ckpt --outdir path/to/your/folder_samples --save
 ```
+
+## Customization
+Below you find the two relevant lines to modify concerning U-Net architecture and data loaders
+```bash
+base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
+train_dataloader,test_dataloader=create_cloud_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
+                ratio=0.5, length=-1, num_patches=2000, percents=[99,0,70])
+```
+In data.py you find all the available dataloaders with the title create_{name}_dataloader
+In data_load.py you find all the Dataset classes for the available datasets. 
 
 ## References
 
