@@ -5,9 +5,6 @@
   height="30%" 
   src="assets/diff1.gif">
 </p>
-![60 epochs training from scratch](assets/diff1.gif "60 epochs training from scratch")
-
-A simple codebase for my master thesis work about diffusion models for EO
 
 ## Demo
 You can find a demo at the following notebook EO_Diffusion.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/weiji14/deepbedmap/]
