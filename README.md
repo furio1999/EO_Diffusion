@@ -22,6 +22,7 @@ Conda environment:
 - Pytorch: 11.3.0
 - Torchvision + torchaudio: 0.14.0 + 0.13.0
 - Tested on an NVIDIA RTX 4000 (49 GB)
+
 GPU utilities installation:
 I don't recomment using the exported eo_diffusion.yml file. It's better to install it directly from pytorch website with the required versions, as shown in the command below:
 
@@ -70,6 +71,17 @@ train_dataloader,test_dataloader=create_cloud_dataloaders(batch_size=args.batch_
 ```
 In data.py you find all the available dataloaders with the title create_{dataset_name}_dataloader. </br>
 In data_load.py you find all the Dataset classes for the available datasets. 
+
+Concerning U-Net and Diffusion, you can modify the parameters at this two lines:
+```bash
+unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
+                attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
+model=EODiffusion(unet,
+            timesteps=args.timesteps,
+            image_size=image_size,
+            in_channels=in_channels
+            ).to(device)
+```
 
 ## References
 
