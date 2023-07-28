@@ -1,15 +1,27 @@
 # EO-Diffusion
-![60 epochs training from scratch](assets/diff1.gif "60 epochs training from scratch")
+<p align="center">
+  <img   
+  width="30%"
+  height="30%" 
+  src="assets/diff1.gif">
+</p>
 
-A simple codebase for my master thesis work about diffusion models for EO
+## Demo
+You can find a demo at the following notebook [EO_Diffusion.ipynb](EO_Diffusion.ipynb)
+## Use-Cases
+### Cloud Removal
+
+### Synthetic OSCD
+
+### Urban Replanning
 
 ## Installation
 Conda environment: 
 - Conda 23.1.0
-- NVIDIA rtx 4000 (49 GB)
 - CUDA toolkit: 11.7.1
 - Pytorch: 11.3.0
 - Torchvision + torchaudio: 0.14.0 + 0.13.0
+- Tested on an NVIDIA RTX 4000 (49 GB)
 
 GPU utilities installation:
 I don't recomment using the exported eo_diffusion.yml file. It's better to install it directly from pytorch website with the required versions, as shown in the command below:
@@ -48,6 +60,27 @@ python train.py --dir path/to/your/dir --ckpt ckpt_name
 --save option if you want to store images
 ```bash
 python inference.py --ckpt path/to/your/ckpt --outdir path/to/your/folder_samples --save
+```
+
+## Customization
+Below you find the two relevant lines to modify concerning U-Net architecture and data loaders, in train.py and inference.py
+```bash
+base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
+train_dataloader,test_dataloader=create_cloud_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
+                ratio=0.5, length=-1, num_patches=2000, percents=[99,0,70])
+```
+In data.py you find all the available dataloaders with the title create_{dataset_name}_dataloader. </br>
+In data_load.py you find all the Dataset classes for the available datasets. 
+
+Concerning U-Net and Diffusion, you can modify the parameters at this two lines:
+```bash
+unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
+                attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
+model=EODiffusion(unet,
+            timesteps=args.timesteps,
+            image_size=image_size,
+            in_channels=in_channels
+            ).to(device)
 ```
 
 ## References
