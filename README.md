@@ -7,7 +7,7 @@
 </p>
 
 ## Demo
-download the following checkpoint https://drive.google.com/file/d/1u415nF2ZzsNnJ8w-BdzT8FC8123R4LcJ/view?usp=drive_link in "results" folder and rename it "clouds_best.pt"
+download the following checkpoint https://drive.google.com/file/d/1u415nF2ZzsNnJ8w-BdzT8FC8123R4LcJ/view?usp=drive_link in "results" folder and rename it "clouds_best.pt". </br>
 You can find a demo at the following notebook [EO_Diffusion.ipynb](EO_Diffusion.ipynb)
 ## Use-Cases
 ### Cloud Removal
