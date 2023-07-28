@@ -1,4 +1,10 @@
 # EO-Diffusion
+<p align="center">
+  <img   
+  width="100%"
+  height="100%" 
+  src="assets/diff1.gif">
+</p>
 ![60 epochs training from scratch](assets/diff1.gif "60 epochs training from scratch")
 
 A simple codebase for my master thesis work about diffusion models for EO
@@ -60,7 +66,7 @@ python inference.py --ckpt path/to/your/ckpt --outdir path/to/your/folder_sample
 ```
 
 ## Customization
-Below you find the two relevant lines to modify concerning U-Net architecture and data loaders
+Below you find the two relevant lines to modify concerning U-Net architecture and data loaders, in train.py and inference.py
 ```bash
 base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
 train_dataloader,test_dataloader=create_cloud_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
