@@ -17,6 +17,7 @@ You can find a demo at the following notebook [EO_Diffusion.ipynb](EO_Diffusion.
   height="30%" 
   src="assets/slides_cr.png">
 </p>
+
 ### Synthetic OSCD
 <p align="center">
   <img   
@@ -24,6 +25,7 @@ You can find a demo at the following notebook [EO_Diffusion.ipynb](EO_Diffusion.
   height="30%" 
   src="assets/slides_oscd.png">
 </p>
+
 ### Urban Replanning
 <p align="center">
   <img   
