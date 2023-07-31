@@ -11,10 +11,26 @@ download the following checkpoint https://drive.google.com/file/d/1u415nF2ZzsNnJ
 You can find a demo at the following notebook [EO_Diffusion.ipynb](EO_Diffusion.ipynb)
 ## Use-Cases
 ### Cloud Removal
-
+<p align="center">
+  <img   
+  width="30%"
+  height="30%" 
+  src="assets/slides_cr.png">
+</p>
 ### Synthetic OSCD
-
+<p align="center">
+  <img   
+  width="30%"
+  height="30%" 
+  src="assets/slides_oscd.png">
+</p>
 ### Urban Replanning
+<p align="center">
+  <img   
+  width="30%"
+  height="30%" 
+  src="assets/inpaint.png">
+</p>
 
 ## Installation
 Conda environment: 
