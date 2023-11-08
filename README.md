@@ -1,5 +1,5 @@
 # EO-Diffusion
-Code for our paper "Diffusion Models for Earth Observation Use-cases: from cloud removal to urban change detection", accepted as oral at Big Data From Space 2023 (BIDS 2023)
+Code for our [paper](assets/2023_BIDS_Diffusion_Models_for_EO.pdf) "Diffusion Models for Earth Observation Use-cases: from cloud removal to urban change detection", accepted as oral at Big Data From Space 2023 (BIDS 2023)
 <p align="center">
   <img   
   width="30%"
