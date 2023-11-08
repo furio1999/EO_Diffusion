@@ -1,12 +1,5 @@
 # EO-Diffusion
-<p align="center">
-  <img   
-  width="60%"
-  height="60%" 
-  src="assets/SapienzaEsa.png">
-</p>
-This work is the result of a collaboration between [European Space Agency](https://www.esa.int/), [Φ-Lab](https://philab.esa.int/about/) and [Sapienza University of Rome](https://www.uniroma1.it/it/), [Alcor Lab](https://alcorlab.diag.uniroma1.it/) for my master thesis ([manuscript pdf](assets/Fulvio_Master_Thesis_Definitive.pdf))
-Code for our [paper](assets/2023_BIDS_Diffusion_Models_for_EO.pdf) "Diffusion Models for Earth Observation Use-cases: from cloud removal to urban change detection", accepted as oral at Big Data From Space 2023 (BIDS 2023)
+Here you find the code for our [paper](assets/2023_BIDS_Diffusion_Models_for_EO.pdf) "Diffusion Models for Earth Observation Use-cases: from cloud removal to urban change detection", accepted as oral at Big Data From Space 2023 (BIDS 2023)
 <p align="center">
   <img   
   width="30%"
@@ -117,4 +110,13 @@ Lilian Weng blog on Diffusion Models: https://lilianweng.github.io/posts/2021-07
 The Denoising Diffusion Probabilistic Models paper: https://arxiv.org/pdf/2006.11239.pdf 
 
 RePaint paper: https://arxiv.org/abs/2201.09865
+
+## Acknowledgments
+<p align="center">
+  <img   
+  width="60%"
+  height="60%" 
+  src="assets/SapienzaEsa.png">
+</p>
+This work is the result of a collaboration between [European Space Agency](https://www.esa.int/), [Φ-Lab](https://philab.esa.int/about/) and [Sapienza University of Rome](https://www.uniroma1.it/it/), [Alcor Lab](https://alcorlab.diag.uniroma1.it/) for my master thesis ([manuscript pdf](assets/Fulvio_Master_Thesis_Definitive.pdf)).
 
