@@ -1,15 +1,9 @@
 # EO-Diffusion
-<p align="left">
+<p align="center">
   <img   
-  width="30%"
-  height="30%" 
-  src="assets/Sapienza_Roma_Logo.png">
-</p>
-<p align="right">
-  <img   
-  width="30%"
-  height="30%" 
-  src="assets/ESA_logo_2020_Deep.png">
+  width="60%"
+  height="60%" 
+  src="assets/SapienzaEsa.png">
 </p>
 This work is the result of a collaboration between [European Space Agency](https://www.esa.int/), [Φ-Lab](https://philab.esa.int/about/) and [Sapienza University of Rome](https://www.uniroma1.it/it/), [Alcor Lab](https://alcorlab.diag.uniroma1.it/) for my master thesis ([manuscript pdf](assets/Fulvio_Master_Thesis_Definitive.pdf))
 Code for our [paper](assets/2023_BIDS_Diffusion_Models_for_EO.pdf) "Diffusion Models for Earth Observation Use-cases: from cloud removal to urban change detection", accepted as oral at Big Data From Space 2023 (BIDS 2023)
