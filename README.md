@@ -54,55 +54,6 @@ conda install pip
 pip install -r requirements.txt
 ```
 
-## Training
-
-```bash
-python train.py
-```
-
-Specify batch size, diffusion steps training hyperparameters from command line (you have default values otherwise)
-```bash
-python train.py --batch_size 4 --timesteps 1000 --lr 1e-05 --epochs 200
-```
-
-### Conditional Training
-Based on the same concept expressed in RePaint https://arxiv.org/abs/2201.09865
-```bash
-python train.py --cond_type "sum"
-```
-
-Save your results
-```bash
-python train.py --dir path/to/your/dir --ckpt ckpt_name
-```
-
-## Testing
---save option if you want to store images
-```bash
-python inference.py --ckpt path/to/your/ckpt --outdir path/to/your/folder_samples --save
-```
-
-## Customization
-Below you find the two relevant lines to modify concerning U-Net architecture and data loaders, in train.py and inference.py
-```bash
-base_dim, dim_mults, attention_resolutions,num_res_blocks, num_heads=128,[1,2,3,4],[4,8],2,8
-train_dataloader,test_dataloader=create_cloud_dataloaders(batch_size=args.batch_size, num_workers=4, size=image_size,
-                ratio=0.5, length=-1, num_patches=2000, percents=[99,0,70])
-```
-In data.py you find all the available dataloaders with the title create_{dataset_name}_dataloader. </br>
-In data_load.py you find all the Dataset classes for the available datasets. 
-
-Concerning U-Net and Diffusion, you can modify the parameters at this two lines:
-```bash
-unet = UNetModel(image_size, in_channels=in_channels+cond_channels, model_channels=base_dim, out_channels=out_channels, channel_mult=dim_mults, 
-                attention_resolutions=attention_resolutions,num_res_blocks=num_res_blocks, num_heads=num_heads, num_classes=num_classes)
-model=EODiffusion(unet,
-            timesteps=args.timesteps,
-            image_size=image_size,
-            in_channels=in_channels
-            ).to(device)
-```
-
 ## References
 
 Lilian Weng blog on Diffusion Models: https://lilianweng.github.io/posts/2021-07-11-diffusion-models/
