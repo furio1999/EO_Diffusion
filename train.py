@@ -7,7 +7,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import *
 from diffusion.model import EODiffusion
 from backbones.unet_openai import UNetModel
-from utils import ExponentialMovingAverage
+from script_utils.utils import ExponentialMovingAverage
 import os
 import math
 import argparse
@@ -15,7 +15,7 @@ from data import *
 from pytorch_lightning.loggers import WandbLogger
 import wandb, pdb
 from tqdm import tqdm
-from train_utils import KeyframeLR
+from script_utils.train_utils import KeyframeLR
 
 
 

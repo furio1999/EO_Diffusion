@@ -8,7 +8,7 @@ from omegaconf import OmegaConf
 
 from backbones.unet_openai import UnetModel
 from diffusion.model_pl import EO_Diffusion
-from train_utils import CustomModelCheckpoint, EMACallback
+from script_utils.train_utils import CustomModelCheckpoint, EMACallback
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training MNISTDiffusion")

@@ -10,11 +10,11 @@ from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from diffusion.model import EODiffusion
-from utils import *
+from script_utils.utils import *
 import os
 import math
 import argparse
-from data import *
+from data_utils.data import *
 from pytorch_lightning.loggers import WandbLogger
 from PIL import Image
 from backbones.unet_openai import UNetModel
