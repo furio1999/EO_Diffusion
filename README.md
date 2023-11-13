@@ -70,5 +70,5 @@ RePaint paper: https://arxiv.org/abs/2201.09865
   src="assets/SapienzaEsa.png">
 </p>
 
-This work is the result of a collaboration between [ESA](https://www.esa.int/), [Φ-Lab](https://philab.esa.int/about/) and [Sapienza University of Rome](https://www.uniroma1.it/it/), [Alcor Lab](https://alcorlab.diag.uniroma1.it/) for my master thesis ([manuscript pdf](assets/Fulvio_Master_Thesis_Definitive.pdf)).
+This work is the result of a collaboration between [ESA](https://www.esa.int/), [Φ-Lab](https://philab.esa.int/about/) and [Sapienza University of Rome](https://www.uniroma1.it/it/), [Alcor Lab](https://alcorlab.diag.uniroma1.it/)
 
